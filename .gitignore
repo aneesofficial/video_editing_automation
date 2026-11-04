@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Build outputs
+dist/
+backend/dist/
+frontend/dist/
+
+# Local databases & Redis
+dev.db
+dev.db-journal
+dump.rdb
+*.db
+*.db-journal
+
+# Local storage files
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep
+backend/storage/exports/*
+!backend/storage/exports/.gitkeep
+backend/storage/temp/*
+!backend/storage/temp/.gitkeep
+backend/storage/thumbnails/*
+!backend/storage/thumbnails/.gitkeep
+
+# Environment files
+.env
+backend/.env
+frontend/.env
+*.env.local
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Logs
+*.log

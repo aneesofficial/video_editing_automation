@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment
+.env
+
+# Database
+dev.db
+dev.db-journal
+
+# Local Storage
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/exports/*
+!storage/exports/.gitkeep
+storage/temp/*
+!storage/temp/.gitkeep
+storage/thumbnails/*
+!storage/thumbnails/.gitkeep
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Logs & temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

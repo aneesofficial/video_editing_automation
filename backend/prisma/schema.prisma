@@ -1,0 +1,284 @@
+// Prisma schema for NovaCut Studio AI Video Editor
+// Compatible with SQLite (development/local) and PostgreSQL (production)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projects    Project[]
+}
+
+model Project {
+  id                  String               @id @default(uuid())
+  workspaceId         String?
+  workspace           Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  title               String
+  description         String?
+  status              String               @default("draft") // draft, processing, ready, failed
+  targetPlatform      String               @default("youtube") // youtube, tiktok, instagram_reels, shorts
+  aspectRatio         String               @default("16:9") // 16:9, 9:16, 1:1, 4:5
+  resolution          String               @default("1080p") // 1080p, 4k, 720p
+  durationSeconds     Float?               @default(0)
+  thumbnailUrl        String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  mediaAssets         MediaAsset[]
+  editingInstructions EditingInstruction[]
+  editingPlans        EditingPlan[]
+  timelineTracks      TimelineTrack[]
+  renderingJobs       RenderingJob[]
+  exportedFiles       ExportedFile[]
+}
+
+model MediaAsset {
+  id              String         @id @default(uuid())
+  projectId       String
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  filename        String
+  originalName    String
+  mimeType        String
+  fileSizeBytes   Int
+  storagePath     String
+  durationSeconds Float?
+  width           Int?
+  height          Int?
+  fps             Float?
+  codec           String?
+  hasAudio        Boolean        @default(true)
+  audioChannels   Int?
+  audioSampleRate Int?
+  status          String         @default("uploaded") // uploaded, analyzing, analyzed, error
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  metadata        VideoMetadata?
+  transcription   Transcription?
+  scenes          DetectedScene[]
+  timelineClips   TimelineClip[]
+}
+
+model VideoMetadata {
+  id             String      @id @default(uuid())
+  mediaAssetId   String      @unique
+  mediaAsset     MediaAsset  @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  format         String
+  duration       Float
+  bitrate        Int?
+  videoCodec     String?
+  audioCodec     String?
+  width          Int
+  height         Int
+  aspectRatio    String
+  frameRate      Float
+  audioChannels  Int?
+  sampleRate     Int?
+  rawMetadataJson String?    // JSON stringified ffprobe stream & format info
+  createdAt      DateTime    @default(now())
+}
+
+model Transcription {
+  id           String                 @id @default(uuid())
+  mediaAssetId String                 @unique
+  mediaAsset   MediaAsset             @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  language     String                 @default("en")
+  fullText     String
+  wordCount    Int                    @default(0)
+  duration     Float                  @default(0)
+  confidence   Float?                 @default(0.9)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  segments     TranscriptionSegment[]
+}
+
+model TranscriptionSegment {
+  id              String        @id @default(uuid())
+  transcriptionId String
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+  startTime       Float
+  endTime         Float
+  text            String
+  wordsJson       String?       // JSON array of word objects with timing if available
+  confidence      Float?
+}
+
+model DetectedScene {
+  id           String     @id @default(uuid())
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  sceneIndex   Int
+  startTime    Float
+  endTime      Float
+  duration     Float
+  cutType      String     @default("cut") // cut, dissolve, fade
+  score        Float?
+  thumbnailPath String?
+}
+
+model EditingInstruction {
+  id             String       @id @default(uuid())
+  projectId      String
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userPrompt     String
+  editingStyle   String       @default("dynamic") // dynamic, cinematic, tutorial, fast_paced, minimalist
+  targetDuration Float?
+  musicMood      String?      // upbeat, cinematic, corporate, none
+  captionStyle   String?      // standard, animated, bold, karaoke, none
+  autoColorGrade Boolean      @default(false)
+  autoDenoise    Boolean      @default(false)
+  removeSilences Boolean      @default(true)
+  status         String       @default("pending") // pending, processing, completed, failed
+  errorMessage   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  editingPlan    EditingPlan?
+}
+
+model EditingPlan {
+  id                   String             @id @default(uuid())
+  projectId            String
+  project              Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  instructionId        String             @unique
+  instruction          EditingInstruction @relation(fields: [instructionId], references: [id], onDelete: Cascade)
+  summary              String
+  rationale            String?
+  selectedScenesJson   String             // JSON array of scene selections with in/out points
+  removedSilencesJson  String?            // JSON array of removed silence intervals
+  captionPlanJson      String?            // JSON caption configuration
+  audioPlanJson        String?            // JSON background audio / sound design configuration
+  transitionsJson      String?            // JSON list of transitions
+  targetDurationSeconds Float
+  status               String             @default("generated") // generated, applied, modified, rejected
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model TimelineTrack {
+  id        String         @id @default(uuid())
+  projectId String
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  trackType String         // video, audio, caption, overlay
+  trackIndex Int
+  isMuted   Boolean        @default(false)
+  isLocked  Boolean        @default(false)
+  volume    Float          @default(1.0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  clips     TimelineClip[]
+  captions  CaptionItem[]
+  audios    AudioAsset[]
+}
+
+model TimelineClip {
+  id             String        @id @default(uuid())
+  trackId        String
+  track          TimelineTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  mediaAssetId   String?
+  mediaAsset     MediaAsset?   @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  name           String
+  startTime      Float         // Position on project timeline in seconds
+  duration       Float         // Duration on project timeline in seconds
+  sourceIn       Float         // Trim in-point from source asset in seconds
+  sourceOut      Float         // Trim out-point from source asset in seconds
+  speed          Float         @default(1.0)
+  volume         Float         @default(1.0)
+  filtersJson    String?       // color adjustments, scale, position
+  transitionIn   String?       // fade_in, crossfade
+  transitionOut  String?       // fade_out
+  clipOrder      Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model CaptionItem {
+  id         String        @id @default(uuid())
+  trackId    String
+  track      TimelineTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  startTime  Float
+  endTime    Float
+  text       String
+  styleJson  String?       // font, size, color, position, animation
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model AudioAsset {
+  id          String        @id @default(uuid())
+  trackId     String
+  track       TimelineTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  name        String
+  audioUrl    String
+  storagePath String
+  startTime   Float
+  duration    Float
+  volume      Float         @default(0.7)
+  fadeIn      Float         @default(0.0)
+  fadeOut     Float         @default(0.0)
+  audioType   String        @default("background_music") // background_music, sfx, voiceover
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model RenderingJob {
+  id             String         @id @default(uuid())
+  projectId      String
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jobType        String         @default("export_video") // export_video, generate_proxy, audio_mix
+  status         String         @default("queued") // queued, processing, completed, failed, cancelled
+  progressPercent Float         @default(0)
+  currentStage   String         @default("Initializing")
+  errorMessage   String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  jobEvents      JobEvent[]
+  exportedFiles  ExportedFile[]
+}
+
+model JobEvent {
+  id             String       @id @default(uuid())
+  renderingJobId String
+  renderingJob   RenderingJob @relation(fields: [renderingJobId], references: [id], onDelete: Cascade)
+  stage          String
+  progress       Float
+  message        String
+  detailsJson    String?
+  timestamp      DateTime     @default(now())
+}
+
+model ExportedFile {
+  id             String        @id @default(uuid())
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  renderingJobId String?
+  renderingJob   RenderingJob? @relation(fields: [renderingJobId], references: [id], onDelete: SetNull)
+  filename       String
+  mimeType       String        @default("video/mp4")
+  fileSizeBytes  Int
+  storagePath    String
+  publicUrl      String
+  width          Int
+  height         Int
+  duration       Float
+  resolution     String        @default("1080p")
+  format         String        @default("mp4")
+  createdAt      DateTime      @default(now())
+}
+
