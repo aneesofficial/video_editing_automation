@@ -9,13 +9,13 @@
     "start": "node dist/server.js",
     "worker": "tsx src/workers/index.ts",
     "generate-previews": "tsx src/scripts/generate-previews.ts",
-    "test:preview": "tsx src/scripts/test-preview-pipeline.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
     "test": "vitest run",
     "test:pipeline": "vitest run tests/pipeline.test.ts",
     "typecheck": "tsc --noEmit",
+    "smoke": "tsx src/scripts/smoke-test.ts",
     "lint": "oxlint src"
   },
   "dependencies": {

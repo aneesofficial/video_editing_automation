@@ -16,7 +16,6 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
   DATABASE_URL: z.string().default('file:./dev.db'),
-  REDIS_URL: z.string().optional().default(''),
 
   STORAGE_DIR: z.string().default('./storage'),
   MAX_UPLOAD_SIZE_BYTES: z.coerce.number().default(2147483648), // 2GB

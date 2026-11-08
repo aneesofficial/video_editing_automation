@@ -48,6 +48,46 @@ export interface MusicTrack {
   createdAt: string;
 }
 
+export interface SystemHealthReport {
+  status: 'healthy' | 'degraded';
+  timestamp: string;
+  service: string;
+  version: string;
+  database: { status: string; message: string };
+  ffmpeg: { status: string; message: string; version?: string; path: string };
+  python: { status: string; message: string; version?: string; path: string };
+  whisper: { status: string; model: string };
+  onnx: { status: string; model: string; exists: boolean; sizeMb?: number };
+  gemini: { status: string; model: string; hasKey: boolean; maskedKey: string | null };
+  stock: {
+    pexels: { hasKey: boolean; maskedKey: string | null; configured: boolean };
+    pixabay: { hasKey: boolean; maskedKey: string | null; configured: boolean };
+  };
+  disk: { freeGb: number; totalGb: number; warning: boolean };
+  musicLibrary: { trackCount: number };
+}
+
+export interface ClientStorageInfo {
+  name: string;
+  projectCount: number;
+  totalSizeMb: number;
+}
+
+export interface StorageOverviewReport {
+  disk: { freeGb: number; totalGb: number; warning: boolean };
+  clients: ClientStorageInfo[];
+  tempSizeMb: number;
+  cacheCleanableMb: number;
+}
+
+export interface BackupResult {
+  fileName: string;
+  filePath: string;
+  sizeBytes: number;
+  fileCount: number;
+  createdAt: string;
+}
+
 export type StockMediaType = 'video' | 'photo';
 export type StockSource = 'pexels' | 'pixabay' | 'all';
 export type StockOrientation = 'landscape' | 'portrait' | 'square' | 'all';
@@ -1130,6 +1170,41 @@ class ApiClient {
     if (!res.ok) return null;
     const json = await res.json();
     return json.data || null;
+  }
+
+  // --- Step 9 System Health & Storage Management Methods ---
+
+  async getSystemHealth(): Promise<SystemHealthReport> {
+    const res = await fetch(`${this.baseUrl}/api/health`);
+    if (!res.ok) throw new Error('Failed to retrieve system health');
+    return res.json();
+  }
+
+  async getStorageOverview(): Promise<StorageOverviewReport> {
+    const res = await fetch(`${this.baseUrl}/api/v1/system/storage`);
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to retrieve storage overview');
+    return json.data;
+  }
+
+  async cleanCache(): Promise<{ freedMb: number; cleanedFilesCount: number }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/system/clean-cache`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to clean cache');
+    return json.data;
+  }
+
+  async createBackup(): Promise<BackupResult> {
+    const res = await fetch(`${this.baseUrl}/api/v1/system/backup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to create backup');
+    return json.data;
   }
 }
 

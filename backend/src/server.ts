@@ -2,7 +2,6 @@ import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { startWorkers } from './workers/index.js';
 import { prisma } from './config/database.js';
-import { redisConnection } from './config/queue.js';
 
 async function main() {
   try {
@@ -29,7 +28,6 @@ async function main() {
       console.log(`[Server] Received ${signal}, shutting down gracefully...`);
       await app.close();
       await prisma.$disconnect();
-      redisConnection.disconnect();
       process.exit(0);
     };
 

@@ -1,14 +1,15 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { User, Sliders, Film, Server, Music, Globe } from 'lucide-react';
+import { User, Sliders, Film, Server, Music, Globe, HardDrive } from 'lucide-react';
 import { ProfileSettingsForm } from './ProfileSettingsForm';
 import { ExportSettingsForm } from './ExportSettingsForm';
 import { BackendConfigSection } from './BackendConfigSection';
 import { MusicLibrarySection } from './MusicLibrarySection';
 import { StockMediaConfigSection } from './StockMediaConfigSection';
+import { SystemStorageSection } from './SystemStorageSection';
 import { useSettings } from '../../store/SettingsContext';
 
-type SettingsTab = 'profile' | 'appearance' | 'export' | 'backend' | 'music' | 'stock';
+type SettingsTab = 'profile' | 'appearance' | 'export' | 'backend' | 'music' | 'stock' | 'system';
 
 export const SettingsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -107,6 +108,18 @@ export const SettingsPage: React.FC = () => {
         >
           <Globe className="w-4 h-4" />
           <span>Stock Media</span>
+        </button>
+
+        <button
+          onClick={() => setTab('system')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-all ${
+            activeTab === 'system'
+              ? 'border-violet-500 text-white bg-studio-surface'
+              : 'border-transparent text-studio-muted hover:text-studio-text'
+          }`}
+        >
+          <HardDrive className="w-4 h-4" />
+          <span>System & Storage</span>
         </button>
       </div>
 
@@ -280,6 +293,11 @@ export const SettingsPage: React.FC = () => {
       {/* Tab 6: Stock Media APIs */}
       {activeTab === 'stock' && (
         <StockMediaConfigSection />
+      )}
+
+      {/* Tab 7: System Diagnostics & Storage */}
+      {activeTab === 'system' && (
+        <SystemStorageSection />
       )}
     </div>
   );

@@ -28,6 +28,7 @@ import {
   RefreshCw,
   Zap,
   Globe,
+  Key,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -207,6 +208,36 @@ export const WorkspacePage: React.FC = () => {
   const [activeMediaSectionTab, setActiveMediaSectionTab] = useState<'library' | 'stock'>('library');
   const [autoBRoll, setAutoBRoll] = useState<boolean>(false);
   const [excludedBRollIds, setExcludedBRollIds] = useState<string[]>([]);
+
+  // Gemini API Key Inline Configuration State (Saved only to backend/.env, never in localStorage)
+  const [geminiKeyInput, setGeminiKeyInput] = useState<string>('');
+  const [isSavingGeminiKey, setIsSavingGeminiKey] = useState<boolean>(false);
+  const [geminiKeyError, setGeminiKeyError] = useState<string | null>(null);
+  const [geminiKeySuccess, setGeminiKeySuccess] = useState<string | null>(null);
+  const [showGeminiKeyEdit, setShowGeminiKeyEdit] = useState<boolean>(false);
+
+  const handleSaveGeminiKey = async () => {
+    if (!geminiKeyInput.trim()) return;
+    setIsSavingGeminiKey(true);
+    setGeminiKeyError(null);
+    setGeminiKeySuccess(null);
+    try {
+      const res = await apiClient.saveAiKey(geminiKeyInput.trim());
+      if (res.success) {
+        setGeminiKeySuccess('Gemini API key saved & verified successfully!');
+        setGeminiKeyInput('');
+        setShowGeminiKeyEdit(false);
+        const fresh = await apiClient.getAiStatus();
+        setAiStatus(fresh);
+      } else {
+        setGeminiKeyError(res.error || 'Failed to verify Gemini API key');
+      }
+    } catch (err: any) {
+      setGeminiKeyError(err.message || 'Error saving Gemini API key');
+    } finally {
+      setIsSavingGeminiKey(false);
+    }
+  };
 
   // Sync toggles when an active plan is selected or loaded
   useEffect(() => {
@@ -895,6 +926,100 @@ export const WorkspacePage: React.FC = () => {
             })}
           </div>
         </section>
+
+        {/* Gemini API Key Box (directly above prompt box: shows password input if offline/missing, or small green badge if online) */}
+        {aiStatus?.online && aiStatus?.hasKey && !showGeminiKeyEdit ? (
+          <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs">
+            <div className="flex items-center gap-2 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-semibold text-emerald-300">Gemini AI Online</span>
+              <span className="text-emerald-400/80 font-mono text-[11px]">({aiStatus.model})</span>
+              {aiStatus.maskedKey && (
+                <span className="text-emerald-400/60 font-mono text-[10px]">Key: {aiStatus.maskedKey}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGeminiKeyEdit(true)}
+              className="text-[11px] text-emerald-400 hover:text-emerald-200 underline font-medium transition-colors"
+            >
+              Change Key
+            </button>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-xl bg-studio-surface border border-studio-border space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-violet-400" />
+                <span className="text-xs font-semibold text-white">Google Gemini API Key</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {aiStatus?.online ? (
+                  <Badge variant="emerald" size="sm">Online</Badge>
+                ) : (
+                  <Badge variant="rose" size="sm">Offline / Key Required</Badge>
+                )}
+                {aiStatus?.online && (
+                  <button
+                    type="button"
+                    onClick={() => setShowGeminiKeyEdit(false)}
+                    className="text-[11px] text-studio-muted hover:text-white underline"
+                  >
+                    Hide
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-studio-muted leading-relaxed">
+              Enter your Google AI Studio free API key. It is tested and saved directly into{' '}
+              <code className="text-violet-300 font-mono text-[10px] bg-studio-card px-1 py-0.5 rounded">backend/.env</code> (never stored in browser localStorage).
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                value={geminiKeyInput}
+                onChange={(e) => {
+                  setGeminiKeyInput(e.target.value);
+                  setGeminiKeyError(null);
+                  setGeminiKeySuccess(null);
+                }}
+                placeholder={aiStatus?.hasKey ? `Configured (${aiStatus.maskedKey || 'saved'})` : 'Paste Gemini API key (AIzaSy...)'}
+                className="flex-1 bg-studio-card border border-studio-border rounded-lg px-3 py-1.5 text-xs text-white placeholder-studio-subtle focus:outline-none focus:border-violet-500 font-mono"
+              />
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={isSavingGeminiKey || !geminiKeyInput.trim()}
+                onClick={handleSaveGeminiKey}
+                className="flex items-center gap-1.5 text-xs whitespace-nowrap"
+              >
+                {isSavingGeminiKey ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Testing & Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Test & Save</span>
+                  </>
+                )}
+              </Button>
+            </div>
+            {geminiKeyError && (
+              <p className="text-xs text-rose-400 flex items-center gap-1.5 mt-1">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{geminiKeyError}</span>
+              </p>
+            )}
+            {geminiKeySuccess && (
+              <p className="text-xs text-emerald-400 flex items-center gap-1.5 mt-1">
+                <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{geminiKeySuccess}</span>
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Step 4: Big Prompt Box with Example Prompts */}
         <section className="space-y-3">
