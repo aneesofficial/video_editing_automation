@@ -8,7 +8,7 @@ async function main() {
   try {
     const app = await buildApp();
 
-    // Start BullMQ workers in background
+    // Start in-process background workers
     startWorkers();
 
     await app.listen({
@@ -18,11 +18,11 @@ async function main() {
 
     console.log(`=================================================`);
     console.log(`🚀 NovaCut Studio Backend running on http://${env.HOST}:${env.PORT}`);
-    console.log(`📡 Health check: http://localhost:${env.PORT}/health`);
+    console.log(`📡 Health check: http://localhost:${env.PORT}/api/health`);
     console.log(`📁 Local Storage: ${env.STORAGE_DIR}`);
-    console.log(`🧠 AI Ollama: ${env.OLLAMA_BASE_URL} (${env.OLLAMA_MODEL})`);
+    console.log(`🤖 AI Planner: Google Gemini (${env.GEMINI_MODEL})`);
     console.log(`🎙️ Whisper Model: ${env.WHISPER_MODEL}`);
-    console.log(`⚡ Redis: ${env.REDIS_URL}`);
+    console.log(`⚡ Job Engine: In-Process Queue (Zero External Dependencies)`);
     console.log(`=================================================`);
 
     const shutdown = async (signal: string) => {
@@ -42,4 +42,3 @@ async function main() {
 }
 
 main();
-

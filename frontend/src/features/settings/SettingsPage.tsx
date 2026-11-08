@@ -1,12 +1,14 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { User, Sliders, Film, Server } from 'lucide-react';
+import { User, Sliders, Film, Server, Music, Globe } from 'lucide-react';
 import { ProfileSettingsForm } from './ProfileSettingsForm';
 import { ExportSettingsForm } from './ExportSettingsForm';
 import { BackendConfigSection } from './BackendConfigSection';
+import { MusicLibrarySection } from './MusicLibrarySection';
+import { StockMediaConfigSection } from './StockMediaConfigSection';
 import { useSettings } from '../../store/SettingsContext';
 
-type SettingsTab = 'profile' | 'appearance' | 'export' | 'backend';
+type SettingsTab = 'profile' | 'appearance' | 'export' | 'backend' | 'music' | 'stock';
 
 export const SettingsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -81,6 +83,30 @@ export const SettingsPage: React.FC = () => {
               settings.backendConfig.status === 'connected' ? 'bg-emerald-400' : 'bg-studio-subtle'
             }`}
           />
+        </button>
+
+        <button
+          onClick={() => setTab('music')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-all ${
+            activeTab === 'music'
+              ? 'border-violet-500 text-white bg-studio-surface'
+              : 'border-transparent text-studio-muted hover:text-studio-text'
+          }`}
+        >
+          <Music className="w-4 h-4" />
+          <span>Music Library</span>
+        </button>
+
+        <button
+          onClick={() => setTab('stock')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-all ${
+            activeTab === 'stock'
+              ? 'border-violet-500 text-white bg-studio-surface'
+              : 'border-transparent text-studio-muted hover:text-studio-text'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Stock Media</span>
         </button>
       </div>
 
@@ -244,6 +270,16 @@ export const SettingsPage: React.FC = () => {
           </div>
           <BackendConfigSection />
         </div>
+      )}
+
+      {/* Tab 5: Music Library */}
+      {activeTab === 'music' && (
+        <MusicLibrarySection />
+      )}
+
+      {/* Tab 6: Stock Media APIs */}
+      {activeTab === 'stock' && (
+        <StockMediaConfigSection />
       )}
     </div>
   );

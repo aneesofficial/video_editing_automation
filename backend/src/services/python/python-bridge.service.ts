@@ -1,9 +1,13 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { env } from '../../config/env.js';
 
 const execFileAsync = promisify(execFile);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export interface DetectedSceneResult {
   scene_index: number;
@@ -48,7 +52,17 @@ export class PythonBridgeService {
   private scriptPath: string;
 
   constructor() {
-    this.scriptPath = path.resolve(process.cwd(), 'python-worker/app/main.py');
+    const candidate1 = path.resolve(process.cwd(), 'python-worker/app/main.py');
+    const candidate2 = path.resolve(process.cwd(), 'backend/python-worker/app/main.py');
+    const candidate3 = path.resolve(__dirname, '../../../python-worker/app/main.py');
+
+    if (fs.existsSync(candidate1)) {
+      this.scriptPath = candidate1;
+    } else if (fs.existsSync(candidate2)) {
+      this.scriptPath = candidate2;
+    } else {
+      this.scriptPath = candidate3;
+    }
   }
 
   public async detectScenes(videoPath: string, threshold = 27.0): Promise<DetectedSceneResult[]> {
@@ -98,10 +112,26 @@ export class PythonBridgeService {
       if (parsed.success) {
         return parsed.data as TranscriptionResult;
       }
-      throw new Error(parsed.error || 'Transcription failed');
+      console.warn(`[PythonBridge] Transcription returned non-fatal error: ${parsed.error}`);
+      return {
+        language: 'en',
+        duration: 0,
+        full_text: '',
+        word_count: 0,
+        segments: [],
+      };
     } catch (err) {
-      console.error('[PythonBridge] Transcription error:', err);
-      throw new Error(`Transcription failed: ${(err as Error).message}`);
+      console.warn(
+        `[PythonBridge] Transcription non-fatal error for ${mediaPath} (continuing plan without transcript):`,
+        (err as Error).message
+      );
+      return {
+        language: 'en',
+        duration: 0,
+        full_text: '',
+        word_count: 0,
+        segments: [],
+      };
     }
   }
 
@@ -131,7 +161,31 @@ export class PythonBridgeService {
       return [];
     }
   }
+
+  public async generatePhotoPreview(inputPath: string, outputPath: string): Promise<{ width: number; height: number }> {
+    const args = [
+      this.scriptPath,
+      'photo',
+      '--input', inputPath,
+      '--output', outputPath
+    ];
+
+    try {
+      const { stdout } = await execFileAsync(env.PYTHON_PATH, args, {
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: env.JOB_TIMEOUT_MS
+      });
+
+      const parsed = JSON.parse(stdout.trim());
+      if (parsed.success) {
+        return parsed.data;
+      }
+      throw new Error(parsed.error || 'Photo preview generation failed');
+    } catch (err) {
+      console.error('[PythonBridge] Photo preview error:', err);
+      throw new Error(`Photo preview generation failed: ${(err as Error).message}`);
+    }
+  }
 }
 
 export const pythonBridgeService = new PythonBridgeService();
-

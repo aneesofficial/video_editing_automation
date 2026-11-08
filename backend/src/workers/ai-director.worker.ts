@@ -1,7 +1,6 @@
-import { Worker, Job } from 'bullmq';
-import { redisConnection } from '../config/queue.js';
+import { Worker, Job } from '../queues/in-memory-queue.js';
 import { prisma } from '../config/database.js';
-import { aiDirectorService } from '../services/ollama/ai-director.service.js';
+import { geminiPlannerService } from '../services/gemini/gemini-planner.service.js';
 import { pythonBridgeService } from '../services/python/python-bridge.service.js';
 
 export interface AIDirectorJobData {
@@ -57,7 +56,7 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
       await job.updateProgress(40);
 
       // Collect scenes
-      const scenes = primaryAsset.scenes.map((s) => ({
+      const scenes = primaryAsset.scenes.map((s: any) => ({
         scene_index: s.sceneIndex,
         start_time: s.startTime,
         end_time: s.endTime,
@@ -68,7 +67,7 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
       const transcription = primaryAsset.transcription
         ? {
             full_text: primaryAsset.transcription.fullText,
-            segments: primaryAsset.transcription.segments.map((seg) => ({
+            segments: primaryAsset.transcription.segments.map((seg: any) => ({
               start: seg.startTime,
               end: seg.endTime,
               text: seg.text,
@@ -79,16 +78,34 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
       const videoDuration = primaryAsset.durationSeconds || primaryAsset.metadata?.duration || 10.0;
 
       await job.updateProgress(60);
-      console.log(`[AIDirectorWorker] Generating plan via Ollama for project ${instruction.projectId}...`);
+      console.log(`[AIDirectorWorker] Generating plan via Gemini for project ${instruction.projectId}...`);
 
-      const plan = await aiDirectorService.generateEditingPlan({
+      const plan = await geminiPlannerService.generatePlan({
+        projectId: instruction.projectId,
+        projectTitle: instruction.project.title,
         userPrompt: instruction.userPrompt,
-        editingStyle: instruction.editingStyle,
-        targetDuration: instruction.targetDuration || undefined,
-        videoDuration,
-        scenes,
-        transcription,
-        silences,
+        targetPlatform: instruction.project.targetPlatform || 'YouTube 16:9',
+        aspectRatio: instruction.project.aspectRatio || '16:9',
+        resolution: instruction.project.resolution || '1920x1080',
+        targetDurationSeconds: instruction.targetDuration || undefined,
+        assets: instruction.project.mediaAssets.map((a: any) => ({
+          id: a.id,
+          originalName: a.originalName || a.filename,
+          filename: a.filename,
+          isPhoto: !a.hasAudio && !(a.scenes && a.scenes.length),
+          durationSeconds: a.durationSeconds || 10.0,
+          width: a.width || 1920,
+          height: a.height || 1080,
+          storagePath: a.storagePath,
+          scenes: (a.scenes || []).map((s: any) => ({
+            sceneIndex: s.sceneIndex,
+            start: s.startTime,
+            end: s.endTime,
+            duration: s.duration,
+          })),
+          silences,
+          transcription,
+        })),
       });
 
       await job.updateProgress(80);
@@ -100,24 +117,24 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
           projectId: instruction.projectId,
           instructionId,
           summary: plan.summary,
-          rationale: plan.rationale,
-          selectedScenesJson: JSON.stringify(plan.clips),
+          rationale: plan.explanation,
+          selectedScenesJson: JSON.stringify(plan.segments),
           removedSilencesJson: JSON.stringify(silences),
           captionPlanJson: JSON.stringify(plan.captions || []),
-          audioPlanJson: JSON.stringify(plan.music || {}),
-          transitionsJson: JSON.stringify(plan.transitions || []),
-          targetDurationSeconds: plan.targetDuration,
+          audioPlanJson: JSON.stringify(plan.audio || {}),
+          transitionsJson: JSON.stringify(plan.segments.map((s) => s.transition)),
+          targetDurationSeconds: plan.targetDurationSeconds,
           status: 'generated',
         },
         update: {
           summary: plan.summary,
-          rationale: plan.rationale,
-          selectedScenesJson: JSON.stringify(plan.clips),
+          rationale: plan.explanation,
+          selectedScenesJson: JSON.stringify(plan.segments),
           removedSilencesJson: JSON.stringify(silences),
           captionPlanJson: JSON.stringify(plan.captions || []),
-          audioPlanJson: JSON.stringify(plan.music || {}),
-          transitionsJson: JSON.stringify(plan.transitions || []),
-          targetDurationSeconds: plan.targetDuration,
+          audioPlanJson: JSON.stringify(plan.audio || {}),
+          transitionsJson: JSON.stringify(plan.segments.map((s) => s.transition)),
+          targetDurationSeconds: plan.targetDurationSeconds,
           status: 'generated',
         },
       });
@@ -145,8 +162,8 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
 
       // Insert new clips calculated by AI Director
       let timelineCursor = 0;
-      for (let idx = 0; idx < plan.clips.length; idx++) {
-        const c = plan.clips[idx];
+      for (let idx = 0; idx < plan.segments.length; idx++) {
+        const c = plan.segments[idx];
         const clipDuration = (c.sourceOut - c.sourceIn) / (c.speed || 1.0);
 
         await prisma.timelineClip.create({
@@ -228,7 +245,6 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
     }
   },
   {
-    connection: redisConnection,
     concurrency: 1,
   }
 );

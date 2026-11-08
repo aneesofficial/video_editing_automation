@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Film, MoreVertical, Copy, Trash2 } from 'lucide-react';
+import { Film, MoreVertical, Copy, Trash2, Building } from 'lucide-react';
 import { Project } from '../../types/project';
 import { formatDate } from '../../utils/formatters';
 import { Badge, BadgeVariant } from '../ui/Badge';
@@ -30,6 +30,8 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
   };
 
   const statusBadge = getStatusBadge(project.status);
+  const clientName = project.client?.name || project.clientName || 'General';
+  const latestVersion = project.versions?.[0]?.versionTag;
 
   return (
     <div
@@ -42,12 +44,22 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
+            <span className="text-xs text-violet-400 font-medium flex items-center gap-1">
+              <Building className="w-3 h-3" />
+              {clientName}
+            </span>
+            <span className="text-studio-border">•</span>
             <span className="text-sm font-semibold text-studio-text group-hover:text-white truncate">
               {project.title}
             </span>
             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-studio-card text-studio-subtle border border-studio-border">
               {project.preferences?.aspectRatio || '16:9'}
             </span>
+            {latestVersion && (
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {latestVersion}
+              </span>
+            )}
           </div>
           <p className="text-xs text-studio-muted truncate max-w-md mt-0.5">
             {project.rawPrompt || 'No prompt instructions'}

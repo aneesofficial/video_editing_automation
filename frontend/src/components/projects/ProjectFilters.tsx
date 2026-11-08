@@ -1,11 +1,14 @@
 import React from 'react';
-import { Search, LayoutGrid, List, ArrowUpDown } from 'lucide-react';
+import { Search, LayoutGrid, List, ArrowUpDown, Building } from 'lucide-react';
 import { AspectRatio } from '../../types/video';
-import { ProjectStatus } from '../../types/project';
+import { ProjectStatus, Client } from '../../types/project';
 
 interface ProjectFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  clientFilter?: string;
+  onClientFilterChange?: (clientId: string) => void;
+  clients?: Client[];
   statusFilter: ProjectStatus | 'all';
   onStatusFilterChange: (status: ProjectStatus | 'all') => void;
   aspectRatioFilter: AspectRatio | 'all';
@@ -19,6 +22,9 @@ interface ProjectFiltersProps {
 export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
   searchQuery,
   onSearchChange,
+  clientFilter = 'all',
+  onClientFilterChange,
+  clients = [],
   statusFilter,
   onStatusFilterChange,
   aspectRatioFilter,
@@ -37,13 +43,32 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search projects by title or prompt..."
+          placeholder="Search projects by title, client, or prompt..."
           className="w-full bg-studio-card border border-studio-border text-studio-text placeholder-studio-subtle text-xs rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:border-violet-500/80 transition-colors"
         />
       </div>
 
       {/* Filters and View Toggles */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Client Filter */}
+        {onClientFilterChange && (
+          <div className="flex items-center gap-1 bg-studio-card border border-studio-border rounded-lg px-2 py-1">
+            <Building className="w-3.5 h-3.5 text-studio-subtle" />
+            <select
+              value={clientFilter}
+              onChange={(e) => onClientFilterChange(e.target.value)}
+              className="bg-transparent text-studio-muted text-xs focus:outline-none border-none pr-1"
+            >
+              <option value="all" className="bg-studio-card text-studio-text">All Clients</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id} className="bg-studio-card text-studio-text">
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Status Filter */}
         <select
           value={statusFilter}
@@ -89,22 +114,20 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
         <div className="flex items-center bg-studio-card border border-studio-border rounded-lg p-0.5">
           <button
             onClick={() => onViewModeChange('grid')}
-            className={`p-1.5 rounded transition-colors ${
-              viewMode === 'grid'
+            className={`p-1.5 rounded transition-colors ${viewMode === 'grid'
                 ? 'bg-studio-surface text-white shadow-studio-sm'
                 : 'text-studio-muted hover:text-studio-text'
-            }`}
+              }`}
             title="Grid View"
           >
             <LayoutGrid className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onViewModeChange('list')}
-            className={`p-1.5 rounded transition-colors ${
-              viewMode === 'list'
+            className={`p-1.5 rounded transition-colors ${viewMode === 'list'
                 ? 'bg-studio-surface text-white shadow-studio-sm'
                 : 'text-studio-muted hover:text-studio-text'
-            }`}
+              }`}
             title="List View"
           >
             <List className="w-3.5 h-3.5" />

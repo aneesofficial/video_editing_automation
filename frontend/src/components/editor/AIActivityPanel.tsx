@@ -192,10 +192,10 @@ export const AIActivityPanel: React.FC = () => {
                   ? 'AI Director Running...'
                   : isConnected
                   ? 'Local AI Engine Ready'
-                  : 'AI Processing Engine Disconnected'}
+                  : 'Backend Offline'}
               </h4>
               <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-studio-surface text-studio-muted border border-studio-border">
-                {isProcessing ? 'Processing' : isConnected ? 'Ollama + Whisper' : 'Offline'}
+                {isProcessing ? 'Processing' : isConnected ? 'Gemini + Whisper' : 'Offline'}
               </span>
             </div>
             <p className="text-xs text-studio-muted max-w-xl leading-relaxed">

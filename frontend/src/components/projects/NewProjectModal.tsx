@@ -15,47 +15,58 @@ interface NewProjectModalProps {
 
 export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { resetWorkspace, setProjectTitle, setAspectRatio, setResolution } = useWorkspace();
-  const { saveProject } = useProjects();
+  const { resetWorkspace, setProjectTitle, setAspectRatio, setResolution, setCurrentProjectId } = useWorkspace();
+  const { saveProject, clients } = useProjects();
 
   const [title, setTitle] = useState('');
+  const [clientName, setClientName] = useState('');
   const [selectedAspect, setSelectedAspect] = useState<AspectRatio>('16:9');
   const [selectedRes, setSelectedRes] = useState<VideoResolution>('1080p');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalTitle = title.trim() || 'Untitled Video Cut';
-    resetWorkspace();
-    setProjectTitle(finalTitle);
-    setAspectRatio(selectedAspect);
-    setResolution(selectedRes);
+    if (isSubmitting) return;
 
-    const now = new Date().toISOString();
-    saveProject({
-      id: `prj_${Date.now()}`,
-      title: finalTitle,
-      description: 'Newly created video editing workspace',
-      createdAt: now,
-      updatedAt: now,
-      status: 'draft',
-      rawPrompt: '',
-      tags: ['Cut all awkward silences > 0.4s'],
-      preferences: {
-        aspectRatio: selectedAspect,
-        resolution: selectedRes,
-        frameRate: '30fps',
-        style: 'viral-fast',
-        pacingDensity: 4,
-        cutSilences: true,
-        generateCaptions: true,
-        autoColorGrade: false,
-        addBackgroundMusic: false,
-        musicMood: 'chill',
-      },
-    });
+    try {
+      setIsSubmitting(true);
+      const finalTitle = title.trim() || 'Untitled Video Cut';
+      const finalClient = clientName.trim() || 'General';
 
-    onClose();
-    navigate('/workspace');
+      resetWorkspace();
+      setProjectTitle(finalTitle);
+      setAspectRatio(selectedAspect);
+      setResolution(selectedRes);
+
+      const saved = await saveProject({
+        title: finalTitle,
+        clientName: finalClient,
+        description: `Project for ${finalClient}`,
+        status: 'draft',
+        rawPrompt: '',
+        tags: ['Cut all awkward silences > 0.4s'],
+        preferences: {
+          aspectRatio: selectedAspect,
+          resolution: selectedRes,
+          frameRate: '30fps',
+          style: 'viral-fast',
+          pacingDensity: 4,
+          cutSilences: true,
+          generateCaptions: true,
+          autoColorGrade: false,
+          addBackgroundMusic: false,
+          musicMood: 'chill',
+        },
+      });
+
+      setCurrentProjectId(saved.id);
+      onClose();
+      navigate(`/workspace/${saved.id}`);
+    } catch (err) {
+      console.error('Error creating project:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -67,10 +78,10 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
       maxWidth="md"
       footer={
         <>
-          <Button variant="outline" size="sm" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" onClick={handleCreate}>
+          <Button variant="primary" size="sm" onClick={handleCreate} isLoading={isSubmitting}>
             Create Project
           </Button>
         </>
@@ -84,6 +95,28 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
           placeholder="e.g. Q4 Executive Keynote Cut"
           autoFocus
         />
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-studio-muted">
+            Client Name
+          </label>
+          <input
+            list="client-options"
+            type="text"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            placeholder="Select existing client or type new name (e.g. Acme Corp)"
+            className="w-full bg-studio-surface border border-studio-border focus:border-violet-500 rounded-lg px-3 py-2 text-sm text-white placeholder-studio-subtle focus:outline-none transition-colors"
+          />
+          <datalist id="client-options">
+            {clients.map((c) => (
+              <option key={c.id} value={c.name} />
+            ))}
+          </datalist>
+          <p className="text-[11px] text-studio-subtle">
+            Folders on disk will be automatically created under backend/storage/clients/{clientName.trim() || 'General'}/
+          </p>
+        </div>
 
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-studio-muted">

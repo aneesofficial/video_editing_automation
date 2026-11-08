@@ -1,16 +1,6 @@
-import { Redis } from 'ioredis';
-import { env } from './env.js';
-
-export const redisConnection = new Redis(env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
-
-redisConnection.on('error', (err) => {
-  console.error('[Redis Error]', err.message);
-});
-
-redisConnection.on('connect', () => {
-  console.log('[Redis] Connected successfully');
-});
-
+// In-memory queue configuration: Redis is not needed for single-user desktop setup.
+export const redisConnection = {
+  disconnect: () => {},
+  quit: async () => {},
+  on: (_event: string, _callback: Function) => {},
+};

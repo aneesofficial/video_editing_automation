@@ -6,6 +6,7 @@ import {
   Copy,
   Trash2,
   Calendar,
+  Building,
 } from 'lucide-react';
 import { Project } from '../../types/project';
 import { formatDate, formatSimpleDuration } from '../../utils/formatters';
@@ -37,6 +38,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   };
 
   const statusBadge = getStatusBadge(project.status);
+  const clientName = project.client?.name || project.clientName || 'General';
+  const latestVersion = project.versions?.[0]?.versionTag;
 
   return (
     <div
@@ -61,10 +64,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           </div>
         </div>
 
-        <div className="absolute top-2.5 left-2.5">
+        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
           <span className="font-mono text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-black/70 backdrop-blur-xs text-white border border-white/10">
             {project.preferences?.aspectRatio || '16:9'}
           </span>
+          {latestVersion && (
+            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              {latestVersion}
+            </span>
+          )}
         </div>
 
         <div className="absolute top-2.5 right-2.5">
@@ -82,6 +90,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
 
       <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
         <div>
+          {/* Client indicator */}
+          <div className="flex items-center gap-1 text-[11px] font-medium text-violet-400 mb-1 truncate">
+            <Building className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{clientName}</span>
+          </div>
+
           <div className="flex items-start justify-between gap-2">
             <h4 className="text-sm font-semibold text-studio-text group-hover:text-white transition-colors truncate">
               {project.title}

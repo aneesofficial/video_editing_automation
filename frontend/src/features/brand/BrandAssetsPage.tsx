@@ -1,93 +1,114 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { brandKitSchema, BrandKitFormValues } from './brandSchemas';
-import { Palette, Upload, Check, Trash2, Eye } from 'lucide-react';
+import { Palette, Upload, Check, Trash2, Eye, ShieldCheck, HardDrive } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Slider } from '../../components/ui/Slider';
+import { apiClient, BrandKitConfig } from '../../services/apiClient';
 
-interface BrandKitState extends BrandKitFormValues {
-  logoDataUrl: string | null;
-}
-
-const BRAND_STORAGE_KEY = 'novacut_brand_kit_v1';
-
-const DEFAULT_BRAND_KIT: BrandKitState = {
+const DEFAULT_BRAND_KIT: BrandKitFormValues = {
   brandName: 'Nova Studio Productions',
   primaryColor: '#8b5cf6',
   secondaryColor: '#f1f3f9',
   fontFamily: 'Inter',
   watermarkPosition: 'bottom-right',
   watermarkOpacity: 80,
-  logoDataUrl: null,
 };
 
 export const BrandAssetsPage: React.FC = () => {
-  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(() => {
-    try {
-      const data = localStorage.getItem(BRAND_STORAGE_KEY);
-      return data ? JSON.parse(data).logoDataUrl : null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [watermarkSize, setWatermarkSize] = useState<number>(15);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   const {
     register,
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<BrandKitFormValues>({
     resolver: zodResolver(brandKitSchema),
-    defaultValues: (() => {
-      try {
-        const data = localStorage.getItem(BRAND_STORAGE_KEY);
-        if (data) {
-          const parsed = JSON.parse(data);
-          return {
-            brandName: parsed.brandName || DEFAULT_BRAND_KIT.brandName,
-            primaryColor: parsed.primaryColor || DEFAULT_BRAND_KIT.primaryColor,
-            secondaryColor: parsed.secondaryColor || DEFAULT_BRAND_KIT.secondaryColor,
-            fontFamily: parsed.fontFamily || DEFAULT_BRAND_KIT.fontFamily,
-            watermarkPosition: parsed.watermarkPosition || DEFAULT_BRAND_KIT.watermarkPosition,
-            watermarkOpacity: parsed.watermarkOpacity || DEFAULT_BRAND_KIT.watermarkOpacity,
-          };
-        }
-      } catch {
-        // fallback
-      }
-      return DEFAULT_BRAND_KIT;
-    })(),
+    defaultValues: DEFAULT_BRAND_KIT,
   });
 
   const watchedValues = watch();
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Load from backend API on mount
+  useEffect(() => {
+    const loadBrandKit = async () => {
+      try {
+        const kit = await apiClient.getBrandKit();
+        reset({
+          brandName: kit.brandName || DEFAULT_BRAND_KIT.brandName,
+          primaryColor: kit.primaryColor || DEFAULT_BRAND_KIT.primaryColor,
+          secondaryColor: kit.secondaryColor || DEFAULT_BRAND_KIT.secondaryColor,
+          fontFamily: (kit.fontFamily as any) || DEFAULT_BRAND_KIT.fontFamily,
+          watermarkPosition: kit.watermarkPosition || DEFAULT_BRAND_KIT.watermarkPosition,
+          watermarkOpacity: kit.watermarkOpacity || DEFAULT_BRAND_KIT.watermarkOpacity,
+        });
+        if (kit.logoUrl) {
+          setLogoUrl(apiClient.getVideoFileUrl(kit.logoUrl));
+        }
+        if (kit.watermarkSizePercent) {
+          setWatermarkSize(kit.watermarkSizePercent);
+        }
+      } catch (err) {
+        console.warn('Could not load brand kit from backend API:', err);
+      }
+    };
+    loadBrandKit();
+  }, [reset]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setLogoDataUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setIsUploadingLogo(true);
+      try {
+        const res = await apiClient.uploadBrandLogo(file);
+        setLogoUrl(apiClient.getVideoFileUrl(res.logoUrl));
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 2500);
+      } catch (err: any) {
+        alert('Failed to upload logo: ' + err.message);
+      } finally {
+        setIsUploadingLogo(false);
+      }
     }
   };
 
-  const onSubmit = (data: BrandKitFormValues) => {
+  const handleRemoveLogo = async () => {
+    setLogoUrl(null);
     try {
-      const combined: BrandKitState = {
-        ...data,
-        logoDataUrl,
-      };
-      localStorage.setItem(BRAND_STORAGE_KEY, JSON.stringify(combined));
+      await apiClient.updateBrandKit({
+        logoFilename: null,
+        logoPath: null,
+        logoUrl: null,
+      });
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 2500);
-    } catch (e) {
-      console.error('Failed to save brand kit:', e);
+    } catch (err: any) {
+      alert('Failed to remove logo: ' + err.message);
+    }
+  };
+
+  const onSubmit = async (data: BrandKitFormValues) => {
+    setIsSaving(true);
+    try {
+      await apiClient.updateBrandKit({
+        ...data,
+        watermarkSizePercent: watermarkSize,
+      });
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (err: any) {
+      alert('Failed to save brand kit: ' + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -103,13 +124,14 @@ export const BrandAssetsPage: React.FC = () => {
             </h2>
           </div>
           <p className="text-xs text-studio-muted mt-1">
-            Configure visual identities, watermarks, and typography applied across automated video exports.
+            Configure visual identities, watermarks, and typography applied across automated video exports. Saved directly to backend storage.
           </p>
         </div>
 
         <Button
           variant="primary"
           size="md"
+          isLoading={isSaving}
           onClick={handleSubmit(onSubmit)}
           leftIcon={savedSuccess ? <Check className="w-4 h-4 text-emerald-400" /> : undefined}
         >
@@ -120,7 +142,13 @@ export const BrandAssetsPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Form Controls */}
         <form onSubmit={handleSubmit(onSubmit)} className="bg-studio-surface border border-studio-border rounded-xl p-5 space-y-5">
-          <h3 className="text-sm font-semibold text-studio-text">Core Visual Identity</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-studio-text">Core Visual Identity</h3>
+            <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
+              <HardDrive className="w-3.5 h-3.5" />
+              backend/storage/brand/
+            </span>
+          </div>
 
           <Input
             label="Organization / Channel Name"
@@ -131,7 +159,7 @@ export const BrandAssetsPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-studio-muted">
-                Primary Brand Accent
+                Primary Brand Accent (Captions & Titles)
               </label>
               <div className="flex items-center gap-2 bg-studio-card border border-studio-border rounded-lg p-2">
                 <input
@@ -179,18 +207,18 @@ export const BrandAssetsPage: React.FC = () => {
           {/* Logo Watermark File Upload */}
           <div className="space-y-2 pt-2 border-t border-studio-border">
             <label className="block text-xs font-medium text-studio-muted">
-              Logo Watermark Graphic (PNG with Alpha)
+              Logo Watermark Graphic (PNG with Transparency)
             </label>
 
-            {logoDataUrl ? (
+            {logoUrl ? (
               <div className="flex items-center justify-between p-3 bg-studio-card border border-studio-border rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded bg-black/60 border border-studio-border p-1 flex items-center justify-center">
-                    <img src={logoDataUrl} alt="Watermark" className="max-h-full max-w-full object-contain" />
+                    <img src={logoUrl} alt="Watermark" className="max-h-full max-w-full object-contain" />
                   </div>
                   <div>
                     <span className="text-xs font-semibold text-studio-text">Active Watermark</span>
-                    <span className="text-[11px] text-studio-subtle block">PNG Alpha Channel Loaded</span>
+                    <span className="text-[11px] text-emerald-400 font-mono block">Saved in backend/storage/brand/</span>
                   </div>
                 </div>
 
@@ -198,7 +226,7 @@ export const BrandAssetsPage: React.FC = () => {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setLogoDataUrl(null)}
+                  onClick={handleRemoveLogo}
                   className="text-rose-400 hover:text-rose-300"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -210,10 +238,13 @@ export const BrandAssetsPage: React.FC = () => {
                   type="file"
                   accept="image/png,image/svg+xml,image/jpeg"
                   onChange={handleLogoUpload}
+                  disabled={isUploadingLogo}
                   className="hidden"
                 />
                 <Upload className="w-6 h-6 text-violet-400 mb-2" />
-                <span className="text-xs font-semibold text-studio-text">Upload Watermark Graphic</span>
+                <span className="text-xs font-semibold text-studio-text">
+                  {isUploadingLogo ? 'Uploading to backend storage...' : 'Upload Watermark Graphic'}
+                </span>
                 <span className="text-[11px] text-studio-subtle mt-0.5">PNG or SVG with transparent background</span>
               </label>
             )}
@@ -249,69 +280,94 @@ export const BrandAssetsPage: React.FC = () => {
             </div>
           </div>
 
-          <Slider
-            label="Watermark Opacity"
-            min={10}
-            max={100}
-            step={5}
-            value={watchedValues.watermarkOpacity || 80}
-            onChange={(val) => setValue('watermarkOpacity', val)}
-            valueDisplay={`${watchedValues.watermarkOpacity || 80}%`}
-          />
+          {/* Watermark Opacity Slider */}
+          <div className="space-y-2 pt-2 border-t border-studio-border">
+            <div className="flex justify-between items-center text-xs font-medium">
+              <span className="text-studio-muted">Watermark Opacity</span>
+              <span className="text-studio-text font-mono">{watchedValues.watermarkOpacity}%</span>
+            </div>
+            <Slider
+              min={10}
+              max={100}
+              step={5}
+              value={watchedValues.watermarkOpacity}
+              onChange={(val) => setValue('watermarkOpacity', val)}
+            />
+          </div>
+
+          {/* Watermark Size Slider */}
+          <div className="space-y-2 pt-2 border-t border-studio-border">
+            <div className="flex justify-between items-center text-xs font-medium">
+              <span className="text-studio-muted">Watermark Size (% of frame width)</span>
+              <span className="text-studio-text font-mono">{watermarkSize}%</span>
+            </div>
+            <Slider
+              min={5}
+              max={35}
+              step={1}
+              value={watermarkSize}
+              onChange={(val) => setWatermarkSize(val)}
+            />
+          </div>
         </form>
 
-        {/* Live Canvas Preview */}
+        {/* Live Preview Monitor */}
         <div className="bg-studio-surface border border-studio-border rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-violet-400" />
-            <h3 className="text-sm font-semibold text-studio-text">Live Brand Composite Preview</h3>
+            <h3 className="text-sm font-semibold text-studio-text">Composite Mockup Preview</h3>
           </div>
 
-          <div className="relative aspect-video w-full bg-[#0b0c10] border border-studio-border rounded-lg overflow-hidden flex items-center justify-center p-6 shadow-inner">
-            <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950 opacity-90" />
-
-            <div className="relative z-10 text-center max-w-sm">
-              <span
-                style={{ fontFamily: watchedValues.fontFamily, color: watchedValues.secondaryColor }}
-                className="text-sm md:text-base font-bold drop-shadow-md"
-              >
-                "AI-driven automated video production delivers unmatched velocity."
+          <div className="relative aspect-video bg-neutral-900 rounded-lg overflow-hidden border border-studio-border flex items-center justify-center">
+            {/* Background mockup graphic */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-neutral-950 via-neutral-900 to-neutral-800 opacity-90" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center z-10">
+              <span className="text-xs font-bold uppercase tracking-widest text-white/50">
+                Automated Export Canvas
               </span>
+              <p
+                style={{ color: watchedValues.primaryColor, fontFamily: watchedValues.fontFamily }}
+                className="text-lg font-black tracking-tight"
+              >
+                {watchedValues.brandName || 'Nova Studio'}
+              </p>
               <div
                 style={{ backgroundColor: watchedValues.primaryColor }}
-                className="h-1 w-12 mx-auto rounded-full mt-2"
-              />
+                className="px-3 py-1 rounded text-white text-xs font-bold shadow-md"
+              >
+                Highlighted Caption Word
+              </div>
             </div>
 
-            {logoDataUrl ? (
-              <img
-                src={logoDataUrl}
-                alt="Brand Watermark"
-                className={`absolute w-12 h-12 object-contain pointer-events-none transition-all ${
-                  watchedValues.watermarkPosition === 'top-left' ? 'top-3 left-3' : ''
-                } ${watchedValues.watermarkPosition === 'top-right' ? 'top-3 right-3' : ''} ${
-                  watchedValues.watermarkPosition === 'bottom-left' ? 'bottom-3 left-3' : ''
-                } ${watchedValues.watermarkPosition === 'bottom-right' ? 'bottom-3 right-3' : ''}`}
-                style={{ opacity: (watchedValues.watermarkOpacity || 80) / 100 }}
-              />
-            ) : (
+            {/* Simulated Watermark Overlay */}
+            {logoUrl && (
               <div
-                className={`absolute pointer-events-none px-2 py-1 rounded bg-black/60 border border-white/10 font-mono text-[10px] text-white/80 ${
-                  watchedValues.watermarkPosition === 'top-left' ? 'top-3 left-3' : ''
-                } ${watchedValues.watermarkPosition === 'top-right' ? 'top-3 right-3' : ''} ${
-                  watchedValues.watermarkPosition === 'bottom-left' ? 'bottom-3 left-3' : ''
-                } ${watchedValues.watermarkPosition === 'bottom-right' ? 'bottom-3 right-3' : ''}`}
-                style={{ opacity: (watchedValues.watermarkOpacity || 80) / 100 }}
+                style={{
+                  opacity: watchedValues.watermarkOpacity / 100,
+                  width: `${watermarkSize * 1.5}%`,
+                }}
+                className={`absolute p-4 z-20 pointer-events-none transition-all ${
+                  watchedValues.watermarkPosition === 'top-left'
+                    ? 'top-0 left-0'
+                    : watchedValues.watermarkPosition === 'top-right'
+                    ? 'top-0 right-0'
+                    : watchedValues.watermarkPosition === 'bottom-left'
+                    ? 'bottom-0 left-0'
+                    : 'bottom-0 right-0'
+                }`}
               >
-                {watchedValues.brandName}
+                <img src={logoUrl} alt="Watermark overlay" className="max-w-full h-auto drop-shadow-md object-contain" />
               </div>
             )}
           </div>
 
-          <div className="p-4 bg-studio-card border border-studio-border rounded-lg space-y-1 text-xs text-studio-muted">
-            <span className="font-semibold text-studio-text block">Local Asset Persistence:</span>
-            <p>
-              Brand presets and graphic logos remain loaded in your browser environment and automatically format generated caption burned-ins and timeline overlays.
+          <div className="p-3 bg-studio-card border border-studio-border rounded-lg space-y-1.5 text-xs text-studio-muted">
+            <div className="flex items-center justify-between text-white font-medium">
+              <span>Safe-Zone Margins</span>
+              <span className="text-emerald-400 font-mono">Libass + FFmpeg</span>
+            </div>
+            <p className="text-[11px] leading-relaxed">
+              When rendering, watermarks and captions automatically obey TikTok and Instagram Reels safe-margin boundaries (minimum 240px bottom margin for 9:16 vertical videos).
             </p>
           </div>
         </div>
@@ -319,4 +375,3 @@ export const BrandAssetsPage: React.FC = () => {
     </div>
   );
 };
-
