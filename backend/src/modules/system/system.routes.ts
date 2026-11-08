@@ -7,3 +7,4 @@ export async function systemRoutes(app: FastifyInstance) {
   app.post('/system/clean-cache', systemController.cleanCache.bind(systemController));
   app.post('/system/backup', systemController.createBackup.bind(systemController));
 }
+

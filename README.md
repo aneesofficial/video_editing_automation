@@ -124,3 +124,4 @@ backend/storage/
 ├── models/               # Local AI models (u2netp.onnx)
 └── temp/                 # Temporary render scratch space (safe to clean)
 ```
+

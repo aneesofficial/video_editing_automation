@@ -39,3 +39,4 @@ echo You can minimize this window.
 echo To shut down both servers at any time, run stop.bat
 echo.
 pause
+
