@@ -19,5 +19,5 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5173" ^| findstr "LISTENING
 
 echo.
 echo All NovaCut Studio servers have been stopped.
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 

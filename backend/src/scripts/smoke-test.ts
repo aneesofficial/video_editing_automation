@@ -129,8 +129,9 @@ print("CREATED")
 
     // Clean up photo output directory after test
     try {
-      if (fs.existsSync(photoResult.versionDir)) {
-        fs.rmSync(path.resolve(photoResult.versionDir, '..'), { recursive: true, force: true });
+      const smokeProjectDir = path.resolve(photoResult.versionDir, '../../..');
+      if (smokeProjectDir.endsWith('smoke-test-project') && fs.existsSync(smokeProjectDir)) {
+        fs.rmSync(smokeProjectDir, { recursive: true, force: true });
       }
     } catch {}
 
@@ -216,10 +217,14 @@ print("CREATED")
       }
     }
     try {
-      if (fs.existsSync(tempDir)) fs.rmdirSync(tempDir);
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
     } catch {
       // Ignore
     }
+    try {
+      const smokeProjectDir = path.join(storageService.getBaseDir(), 'clients', 'General', 'smoke-test-project');
+      if (fs.existsSync(smokeProjectDir)) fs.rmSync(smokeProjectDir, { recursive: true, force: true });
+    } catch {}
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log('====================================================');

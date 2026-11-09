@@ -9,7 +9,7 @@ import { Slider } from '../../components/ui/Slider';
 import { apiClient, BrandKitConfig } from '../../services/apiClient';
 
 const DEFAULT_BRAND_KIT: BrandKitFormValues = {
-  brandName: 'Nova Studio Productions',
+  brandName: '',
   primaryColor: '#8b5cf6',
   secondaryColor: '#f1f3f9',
   fontFamily: 'Inter',
@@ -43,8 +43,9 @@ export const BrandAssetsPage: React.FC = () => {
     const loadBrandKit = async () => {
       try {
         const kit = await apiClient.getBrandKit();
+        const fetchedBrand = kit.brandName === 'Nova Studio Productions' ? '' : (kit.brandName || '');
         reset({
-          brandName: kit.brandName || DEFAULT_BRAND_KIT.brandName,
+          brandName: fetchedBrand,
           primaryColor: kit.primaryColor || DEFAULT_BRAND_KIT.primaryColor,
           secondaryColor: kit.secondaryColor || DEFAULT_BRAND_KIT.secondaryColor,
           fontFamily: (kit.fontFamily as any) || DEFAULT_BRAND_KIT.fontFamily,
@@ -152,6 +153,7 @@ export const BrandAssetsPage: React.FC = () => {
 
           <Input
             label="Organization / Channel Name"
+            placeholder="Your Studio / Brand Name"
             {...register('brandName')}
             error={errors.brandName?.message}
           />
@@ -329,7 +331,7 @@ export const BrandAssetsPage: React.FC = () => {
                 style={{ color: watchedValues.primaryColor, fontFamily: watchedValues.fontFamily }}
                 className="text-lg font-black tracking-tight"
               >
-                {watchedValues.brandName || 'Nova Studio'}
+                {watchedValues.brandName || 'Your Brand'}
               </p>
               <div
                 style={{ backgroundColor: watchedValues.primaryColor }}

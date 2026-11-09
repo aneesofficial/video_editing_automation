@@ -23,7 +23,7 @@ export interface BrandKitConfig {
 }
 
 const DEFAULT_BRAND_KIT: BrandKitConfig = {
-  brandName: 'Nova Studio Productions',
+  brandName: '',
   primaryColor: '#8b5cf6',
   secondaryColor: '#f1f3f9',
   fontFamily: 'Inter',

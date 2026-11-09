@@ -44,7 +44,7 @@ export const DashboardPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-studio-border pb-6">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
-            Welcome back, {settings.profile.name.split(' ')[0]}
+            {settings.profile.name ? `Welcome back, ${settings.profile.name.split(' ')[0]}` : 'Welcome to NovaCut Studio'}
           </h2>
           <p className="text-xs text-studio-muted mt-1">
             NovaCut AI Video Production Workstation • Automated editing & sequence assembly.

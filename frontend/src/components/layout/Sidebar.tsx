@@ -125,14 +125,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-studio-card transition-colors group"
         >
           <div className="w-9 h-9 rounded-lg bg-studio-card border border-studio-borderLight flex items-center justify-center font-mono text-xs font-semibold text-violet-300 group-hover:border-violet-500/50 transition-colors">
-            {settings.profile.avatarInitials || 'CD'}
+            {settings.profile.avatarInitials || 'ME'}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <span className="text-xs font-semibold text-studio-text truncate group-hover:text-white">
-              {settings.profile.name}
+              {settings.profile.name || 'Set up profile'}
             </span>
             <span className="text-[11px] text-studio-muted truncate">
-              {settings.profile.workspaceName}
+              {settings.profile.workspaceName || 'My Studio'}
             </span>
           </div>
         </NavLink>

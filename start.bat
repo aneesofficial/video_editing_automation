@@ -22,7 +22,7 @@ echo [2/3] Starting Frontend UI Server (Port 5173)...
 start "NovaCut Frontend" cmd /k "cd /d ""%~dp0frontend"" && npm run dev"
 
 echo [3/3] Waiting for servers to initialize...
-timeout /t 4 /nobreak >nul
+ping -n 5 127.0.0.1 >nul
 
 echo.
 echo ===================================================

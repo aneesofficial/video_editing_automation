@@ -20,7 +20,6 @@ export const VideoUploader: React.FC = () => {
     uploadQueue,
     dismissUploadQueueItem,
     clearUploadQueue,
-    loadSampleVideo,
     mediaError,
     mediaItems,
   } = useWorkspace();
@@ -113,18 +112,6 @@ export const VideoUploader: React.FC = () => {
             >
               Browse Files
             </Button>
-
-            {mediaItems.length === 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={loadSampleVideo}
-                title="Load a high-definition sample clip for quick test"
-              >
-                Sample Video
-              </Button>
-            )}
           </div>
         </div>
       </div>

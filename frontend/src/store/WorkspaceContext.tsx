@@ -53,7 +53,6 @@ interface WorkspaceContextType {
   clearUploadQueue: () => void;
   // Media Actions
   loadVideoFile: (file: File) => Promise<boolean>;
-  loadSampleVideo: () => void;
   clearVideo: () => void;
   generateMissingPreviews: (projectId?: string) => Promise<void>;
 
@@ -712,38 +711,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return true;
   };
 
-  /**
-   * Load sample video using browser-supported sample clip
-   */
-  const loadSampleVideo = () => {
-    setIsLoadingMedia(true);
-    setMediaError(null);
-
-    // Reliable sample video (open source Big Buck Bunny snippet / standard test mp4)
-    const sampleUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-    
-    setVideoFile(null);
-    setVideoUrl(sampleUrl);
-
-    const meta: VideoMetadata = {
-      name: 'Sample_Tech_Keynote.mp4',
-      sizeBytes: 15 * 1024 * 1024,
-      type: 'video/mp4',
-      durationSeconds: 15,
-      width: 1920,
-      height: 1080,
-      aspectRatio: '16:9',
-      lastModified: Date.now(),
-    };
-
-    setVideoMetadata(meta);
-    setDuration(15);
-    setCurrentTime(0);
-    initTimelineTracksForVideo('Sample_Tech_Keynote.mp4', 15);
-    setProjectTitle('Sample Demo Cut');
-    setIsLoadingMedia(false);
-    setIsDirty(true);
-  };
 
   const clearVideo = () => {
     if (videoUrl && !videoUrl.startsWith('data:') && !videoUrl.startsWith('http')) {
@@ -1018,7 +985,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         dismissUploadQueueItem,
         clearUploadQueue,
         loadVideoFile,
-        loadSampleVideo,
         clearVideo,
         generateMissingPreviews,
         prompt,

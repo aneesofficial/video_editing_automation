@@ -11,11 +11,11 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   profile: {
-    name: 'Creative Director',
-    email: 'creator@novacut.internal',
-    avatarInitials: 'CD',
-    role: 'Editor & Producer',
-    workspaceName: 'Main Production Studio',
+    name: '',
+    email: '',
+    avatarInitials: '',
+    role: '',
+    workspaceName: '',
   },
   exportDefaults: {
     format: 'mp4',
@@ -54,10 +54,17 @@ export const settingsStorage = {
       if (config.apiUrl === 'http://localhost:8000') {
         config.apiUrl = 'http://localhost:3001';
       }
+      const profile = { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) };
+      if (profile.name === 'Creative Director') profile.name = '';
+      if (profile.email === 'creator@novacut.internal') profile.email = '';
+      if (profile.role === 'Editor & Producer') profile.role = '';
+      if (profile.workspaceName === 'Main Production Studio') profile.workspaceName = '';
+      if (profile.avatarInitials === 'CD') profile.avatarInitials = '';
+
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
-        profile: { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) },
+        profile,
         exportDefaults: { ...DEFAULT_SETTINGS.exportDefaults, ...(parsed.exportDefaults || {}) },
         workspacePreferences: { ...DEFAULT_SETTINGS.workspacePreferences, ...(parsed.workspacePreferences || {}) },
         backendConfig: config,

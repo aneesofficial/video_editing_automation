@@ -150,7 +150,7 @@ export class GeminiPhotoPlannerService {
       logo_position: 'top-right',
       logo_size: 14,
       logo_opacity: 85,
-      explanation: 'Engine fallback plan: automatic contrast/exposure correction and focal smart crop applied.',
+      explanation: 'Basic plan (AI was not available): automatic contrast/exposure correction and focal smart crop applied.',
     };
   }
 

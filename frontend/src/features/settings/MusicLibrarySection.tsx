@@ -353,7 +353,7 @@ export const MusicLibrarySection: React.FC = () => {
             <Music className="w-8 h-8 text-studio-subtle mx-auto" />
             <p className="text-xs text-studio-muted">
               {selectedMoodFilter === 'all'
-                ? 'Your music library is currently empty. Upload your first royalty-free track above!'
+                ? 'Add music in Settings > Music Library (upload your royalty-free tracks above).'
                 : `No tracks found with mood "${selectedMoodFilter}".`}
             </p>
           </div>

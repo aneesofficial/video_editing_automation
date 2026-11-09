@@ -808,8 +808,8 @@ STRICT RULES:
     }
 
     return {
-      summary: `Automated ${req.targetPlatform} cut (${segments.length} clips)`,
-      explanation: `Created a safe fallback edit from your uploaded clips: ${reason}. All clips are sequenced on track V1 with balanced pacing.`,
+      summary: 'Basic plan (AI was not available)',
+      explanation: `Basic plan (AI was not available): ${reason}. All clips are sequenced on track V1 with balanced pacing.`,
       frame: {
         platform: req.targetPlatform,
         aspectRatio: req.aspectRatio,
