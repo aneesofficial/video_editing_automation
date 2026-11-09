@@ -21,6 +21,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     apiClient.setBaseUrl(settings.backendConfig.apiUrl);
+    testBackendConnection();
   }, [settings.backendConfig.apiUrl]);
 
   const updateProfile = (profile: Partial<UserProfile>) => {

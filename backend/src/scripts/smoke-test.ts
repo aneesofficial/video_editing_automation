@@ -88,8 +88,8 @@ print("CREATED")
 
     // Process photo with photoService.editPhoto
     const photoResult = await photoService.editPhoto({
-      clientId: 'General',
-      projectId: 'smoke-test-project',
+      clientId: '__temp_smoke_test__',
+      projectId: '__temp_smoke_test__',
       assetId: 'smoke-photo',
       inputPath: smokeInPhoto,
       plan: {
@@ -129,9 +129,9 @@ print("CREATED")
 
     // Clean up photo output directory after test
     try {
-      const smokeProjectDir = path.resolve(photoResult.versionDir, '../../..');
-      if (smokeProjectDir.endsWith('smoke-test-project') && fs.existsSync(smokeProjectDir)) {
-        fs.rmSync(smokeProjectDir, { recursive: true, force: true });
+      const smokeClientDir = path.join(storageService.getBaseDir(), 'clients', '__temp_smoke_test__');
+      if (fs.existsSync(smokeClientDir)) {
+        fs.rmSync(smokeClientDir, { recursive: true, force: true });
       }
     } catch {}
 
@@ -222,8 +222,8 @@ print("CREATED")
       // Ignore
     }
     try {
-      const smokeProjectDir = path.join(storageService.getBaseDir(), 'clients', 'General', 'smoke-test-project');
-      if (fs.existsSync(smokeProjectDir)) fs.rmSync(smokeProjectDir, { recursive: true, force: true });
+      const smokeClientDir = path.join(storageService.getBaseDir(), 'clients', '__temp_smoke_test__');
+      if (fs.existsSync(smokeClientDir)) fs.rmSync(smokeClientDir, { recursive: true, force: true });
     } catch {}
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -244,6 +244,13 @@ print("CREATED")
         if (fs.existsSync(f)) fs.unlinkSync(f);
       } catch {}
     }
+    try {
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+    try {
+      const smokeClientDir = path.join(storageService.getBaseDir(), 'clients', '__temp_smoke_test__');
+      if (fs.existsSync(smokeClientDir)) fs.rmSync(smokeClientDir, { recursive: true, force: true });
+    } catch {}
     process.exit(1);
   }
 }

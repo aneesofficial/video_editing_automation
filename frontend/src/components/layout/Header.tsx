@@ -50,11 +50,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileNav }) => {
           <div className="hidden lg:flex items-center gap-1.5 text-xs">
             <span className="text-studio-muted">AI Engine:</span>
             {backendStatus === 'connected' ? (
-              <Badge variant="emerald" size="sm" dot>Connected</Badge>
+              <Badge variant="emerald" size="sm" dot>Online with Gemini</Badge>
             ) : backendStatus === 'checking' ? (
               <Badge variant="amber" size="sm" dot>Checking...</Badge>
             ) : (
-              <Badge variant="neutral" size="sm" dot>Offline (Local Mode)</Badge>
+              <Badge variant="neutral" size="sm" dot>Backend Offline</Badge>
             )}
           </div>
           <button

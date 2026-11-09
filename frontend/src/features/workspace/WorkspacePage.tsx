@@ -36,10 +36,6 @@ import { VideoUploader } from '../../components/video/VideoUploader';
 import { VideoPlayer } from '../../components/video/VideoPlayer';
 import { MediaLibrary } from '../../components/media/MediaLibrary';
 import { StockMediaPanel } from '../../components/media/StockMediaPanel';
-import { PromptEditor } from '../../components/editor/PromptEditor';
-import { StylePreferences } from '../../components/editor/StylePreferences';
-import { Timeline } from '../../components/editor/Timeline';
-import { AIActivityPanel } from '../../components/editor/AIActivityPanel';
 import { JobPayloadModal } from '../../components/editor/JobPayloadModal';
 import { ExportModal } from '../../components/editor/ExportModal';
 import { PhotoEditingWorkspace } from './PhotoEditingWorkspace';
@@ -123,13 +119,6 @@ const FRAME_OPTIONS: FrameOption[] = [
   },
 ];
 
-const EXAMPLE_PROMPTS = [
-  'Join these clips into a 20 second vertical reel, cut silences, add captions, use zoom on important moments',
-  'Assemble a fast-paced highlights teaser: remove quiet pauses, add punchy captions, and use Ken Burns zoom on photos',
-  'Create a smooth social media story cutting dead air, prioritizing dialogue segments with dynamic captions',
-  'Combine all uploaded footage with quick cuts, sound ducking, and auto transitions matching an upbeat tempo',
-];
-
 export const WorkspacePage: React.FC = () => {
   const { projectId: urlProjectId } = useParams<{ projectId?: string }>();
 
@@ -173,7 +162,6 @@ export const WorkspacePage: React.FC = () => {
   const [activePlan, setActivePlan] = useState<GeminiEditingPlan | null>(null);
   const [planVersions, setPlanVersions] = useState<ProjectPlanItem[]>([]);
   const [selectedPlanVersion, setSelectedPlanVersion] = useState<string>('');
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
 
   // Step 5A Autonomous FFmpeg Rendering State
   const [hardwareEncoder, setHardwareEncoder] = useState<HardwareEncoderInfo | null>(null);
@@ -1021,35 +1009,15 @@ export const WorkspacePage: React.FC = () => {
           </div>
         )}
 
-        {/* Step 4: Big Prompt Box with Example Prompts */}
+        {/* Step 4: Big Prompt Box */}
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-600/30 text-violet-300 font-bold text-xs border border-violet-500/30">
-                4
-              </span>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-white">
-                Editing Instructions & Prompt
-              </h2>
-            </div>
-            <span className="text-[11px] text-studio-muted">Click an example prompt below to fill</span>
-          </div>
-
-          {/* Example prompt pills */}
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLE_PROMPTS.map((exPrompt, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => {
-                  setPrompt(exPrompt);
-                  setIsDirty(true);
-                }}
-                className="text-left text-xs px-3 py-1.5 rounded-lg bg-studio-surface border border-studio-border hover:border-violet-500/50 hover:bg-studio-card text-studio-muted hover:text-white transition-all"
-              >
-                💡 {exPrompt}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-600/30 text-violet-300 font-bold text-xs border border-violet-500/30">
+              4
+            </span>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-white">
+              Editing Instructions &amp; Prompt
+            </h2>
           </div>
 
           {/* Large Prompt Textarea */}
@@ -1066,6 +1034,11 @@ export const WorkspacePage: React.FC = () => {
               className="w-full bg-studio-surface border border-studio-border rounded-xl p-4 text-sm text-white placeholder-studio-subtle focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all leading-relaxed font-sans"
             />
           </div>
+
+          {/* Helper text below prompt */}
+          <p className="text-xs text-studio-muted leading-relaxed">
+            Tell the AI what you want: length, captions, music, zoom, mood. Example: 20 second vertical reel, remove silences, add captions.
+          </p>
 
           {/* Step 8 Feature: Auto B-Roll Switch */}
           <div className="flex items-center justify-between p-3.5 bg-studio-surface border border-studio-border rounded-xl">
@@ -1880,47 +1853,6 @@ export const WorkspacePage: React.FC = () => {
             )}
           </section>
         )}
-
-        {/* Collapsed Advanced Section */}
-        <section className="pt-4 border-t border-studio-border">
-          <button
-            type="button"
-            onClick={() => setIsAdvancedOpen((prev) => !prev)}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-studio-surface border border-studio-border hover:border-studio-subtle hover:bg-studio-card transition-all text-left"
-          >
-            <div className="flex items-center gap-2.5">
-              <Layers className="w-4 h-4 text-violet-400" />
-              <span className="text-xs font-semibold text-white">
-                Advanced Controls (Timeline, Style Preferences & Raw Execution)
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-studio-card border border-studio-border text-studio-muted">
-                Optional
-              </span>
-            </div>
-            {isAdvancedOpen ? (
-              <ChevronUp className="w-4 h-4 text-studio-muted" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-studio-muted" />
-            )}
-          </button>
-
-          {isAdvancedOpen && (
-            <div className="mt-4 space-y-6 p-4 rounded-xl bg-studio-surface/50 border border-studio-border animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <PromptEditor />
-                <StylePreferences />
-              </div>
-
-              <div className="pt-2">
-                <Timeline />
-              </div>
-
-              <div className="pt-2">
-                <AIActivityPanel />
-              </div>
-            </div>
-          )}
-        </section>
       </>
     )}
   </div>

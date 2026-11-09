@@ -73,8 +73,8 @@ export const AIActivityPanel: React.FC = () => {
         }
       }
 
-      // 3. Dispatch AI Director request to local Ollama
-      setCurrentStage('AI Director analyzing scenes, speech & pacing (Ollama)...');
+      // 3. Dispatch AI Director request to Gemini AI
+      setCurrentStage('AI Director analyzing scenes, speech & pacing (Gemini)...');
       const { jobId: instructionId } = await apiClient.submitAIEditingJob({
         projectId: projId,
         userPrompt: prompt,
@@ -168,7 +168,7 @@ export const AIActivityPanel: React.FC = () => {
           </Badge>
         ) : (
           <Badge variant="neutral" size="sm" dot>
-            Backend Offline (Local Mode)
+            Backend Offline
           </Badge>
         )}
       </div>
