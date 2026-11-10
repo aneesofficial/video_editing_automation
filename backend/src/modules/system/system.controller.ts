@@ -49,6 +49,18 @@ export class SystemController {
       });
     }
   }
+
+  public async listBackups(_request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const list = await systemService.listBackups();
+      return reply.send({ success: true, data: list });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: err.message || 'Failed to list backups',
+      });
+    }
+  }
 }
 
 export const systemController = new SystemController();

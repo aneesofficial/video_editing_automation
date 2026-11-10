@@ -172,10 +172,10 @@ export const StockMediaPanel: React.FC<StockMediaPanelProps> = ({
           <div className="flex items-center gap-2.5 text-amber-300">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
-              <strong>Stock API keys not configured.</strong> Add your free Pexels or Pixabay key in Settings to search millions of b-roll clips.
+              <strong>Footage service key not configured.</strong> Add your key in Settings to search extra footage.
             </span>
           </div>
-          <Link to="/settings?tab=stock">
+          <Link to="/settings?tab=services">
             <Button
               type="button"
               variant="outline"
@@ -183,7 +183,7 @@ export const StockMediaPanel: React.FC<StockMediaPanelProps> = ({
               className="text-xs h-7 text-amber-300 border-amber-500/40 hover:bg-amber-500/20 shrink-0"
             >
               <Settings className="w-3.5 h-3.5 mr-1.5" />
-              Configure Stock Keys
+              Configure Service
             </Button>
           </Link>
         </div>
@@ -263,11 +263,11 @@ export const StockMediaPanel: React.FC<StockMediaPanelProps> = ({
             <select
               value={source}
               onChange={(e) => setSource(e.target.value as StockSource)}
-              className="bg-studio-card border border-studio-border text-studio-text rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-violet-500"
+              className="bg-studio-card border border-studio-border text-studio-text rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-amber-500"
             >
-              <option value="all">All Sources (Pexels + Pixabay)</option>
-              <option value="pexels">Pexels only</option>
-              <option value="pixabay">Pixabay only</option>
+              <option value="all">All sources</option>
+              <option value="pexels">Source 1</option>
+              <option value="pixabay">Source 2</option>
             </select>
 
             {/* Orientation Dropdown */}
@@ -319,7 +319,7 @@ export const StockMediaPanel: React.FC<StockMediaPanelProps> = ({
         <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
           <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
           <p className="text-xs text-studio-muted">
-            Searching Pexels & Pixabay for "{query}"...
+            Searching footage for "{query}"...
           </p>
         </div>
       ) : items.length > 0 ? (

@@ -290,7 +290,7 @@ export class GeminiPlannerService {
     }
 
     // 1. Build prompt for Gemini
-    let systemPrompt = `You are NovaCut Studio AI Director, an elite autonomous video editor.
+    let systemPrompt = `You are Studio Director, an elite autonomous video editor.
 The user wants an automated edit of their media assets. You must decide every cut, motion effect, silence removal, caption, and music setting entirely by yourself based on the user's creative prompt and the provided local media analysis (transcription with timestamps, scene cuts from PySceneDetect, and silence intervals).
 
 STRICT RULES:

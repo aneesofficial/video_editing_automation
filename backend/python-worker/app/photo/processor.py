@@ -1,5 +1,5 @@
 """
-NovaCut Photo Editing Processor
+Photo Editing Processor
 Applies image transformations in sequence using Pillow and OpenCV:
 - smart_crop & resize to chosen frame (16:9, 1:1, 4:5, 9:16)
 - rotate & EXIF correction
@@ -421,21 +421,25 @@ def process_photo(
         )
         operations_applied.append("brand_logo")
 
-    # Save Output
+    # Save Output (strip Software tag and EXIF tool info)
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     ext = os.path.splitext(output_path)[1].lower()
+
+    # Clear metadata dictionary
+    img.info = {}
 
     if ext in (".png",):
         img.save(output_path, "PNG", optimize=True)
     elif ext in (".webp",):
-        img.save(output_path, "WEBP", quality=95)
+        img.save(output_path, "WEBP", quality=95, exif=b"")
     else:  # JPG default
         if img.mode in ("RGBA", "P"):
             # Flatten transparency to white before saving as JPG
             bg_white = Image.new("RGB", img.size, (255, 255, 255))
             bg_white.paste(img, (0, 0), img if img.mode == "RGBA" else None)
             img = bg_white
-        img.save(output_path, "JPEG", quality=95, optimize=True)
+            img.info = {}
+        img.save(output_path, "JPEG", quality=95, optimize=True, exif=b"")
 
     return {
         "output_path": output_path,

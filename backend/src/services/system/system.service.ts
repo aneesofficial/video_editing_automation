@@ -13,6 +13,13 @@ export interface SystemHealthReport {
   timestamp: string;
   service: string;
   version: string;
+  videoEngine: { status: string; connected: boolean; fixTip?: string };
+  speech: { status: string; connected: boolean; fixTip?: string };
+  photoCutout: { status: string; connected: boolean; fixTip?: string };
+  editService: { status: string; connected: boolean; fixTip?: string };
+  footageService: { status: string; connected: boolean; fixTip?: string };
+  storage: { status: string; connected: boolean; freeGb: number; totalGb: number; warning: boolean; fixTip?: string };
+  music: { status: string; connected: boolean; trackCount: number; fixTip?: string };
   database: { status: string; message: string };
   ffmpeg: { status: string; message: string; version?: string; path: string };
   python: { status: string; message: string; version?: string; path: string };
@@ -56,8 +63,15 @@ export class SystemService {
     const report: SystemHealthReport = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      service: 'NovaCut Studio Backend',
+      service: 'Studio Backend',
       version: '1.0.0',
+      videoEngine: { status: 'checking', connected: false },
+      speech: { status: 'checking', connected: false },
+      photoCutout: { status: 'checking', connected: false },
+      editService: { status: 'checking', connected: false },
+      footageService: { status: 'checking', connected: false },
+      storage: { status: 'checking', connected: true, freeGb: 0, totalGb: 0, warning: false },
+      music: { status: 'checking', connected: false, trackCount: 0 },
       database: { status: 'checking', message: '' },
       ffmpeg: { status: 'checking', message: '', path: env.FFMPEG_PATH },
       python: { status: 'checking', message: '', path: env.PYTHON_PATH },
@@ -67,17 +81,17 @@ export class SystemService {
         status: env.GEMINI_API_KEY ? 'configured' : 'missing',
         model: env.GEMINI_MODEL,
         hasKey: Boolean(env.GEMINI_API_KEY && env.GEMINI_API_KEY.trim().length > 0),
-        maskedKey: getMaskedApiKey(env.GEMINI_API_KEY),
+        maskedKey: null,
       },
       stock: {
         pexels: {
           hasKey: Boolean(env.PEXELS_API_KEY && env.PEXELS_API_KEY.trim().length > 0),
-          maskedKey: getMaskedApiKey(env.PEXELS_API_KEY),
+          maskedKey: null,
           configured: Boolean(env.PEXELS_API_KEY && env.PEXELS_API_KEY.trim().length > 0),
         },
         pixabay: {
           hasKey: Boolean(env.PIXABAY_API_KEY && env.PIXABAY_API_KEY.trim().length > 0),
-          maskedKey: getMaskedApiKey(env.PIXABAY_API_KEY),
+          maskedKey: null,
           configured: Boolean(env.PIXABAY_API_KEY && env.PIXABAY_API_KEY.trim().length > 0),
         },
       },
@@ -172,6 +186,54 @@ export class SystemService {
     } catch {
       report.musicLibrary = { trackCount: 0 };
     }
+
+    const videoEngineOk = report.ffmpeg.status === 'ok';
+    const speechOk = report.python.status === 'ok';
+    const photoCutoutOk = report.onnx.exists;
+    const editServiceOk = report.gemini.hasKey;
+    const footageServiceOk = report.stock.pexels.hasKey || report.stock.pixabay.hasKey;
+    const storageOk = report.disk.freeGb > 5;
+    const musicOk = report.musicLibrary.trackCount > 0;
+
+    report.videoEngine = {
+      status: videoEngineOk ? 'ok' : 'unavailable',
+      connected: videoEngineOk,
+      fixTip: 'Verify video processing binary is accessible in environment path.',
+    };
+    report.speech = {
+      status: speechOk ? 'ok' : 'unavailable',
+      connected: speechOk,
+      fixTip: 'Verify speech processing module is active in worker environment.',
+    };
+    report.photoCutout = {
+      status: photoCutoutOk ? 'ok' : 'missing',
+      connected: photoCutoutOk,
+      fixTip: 'Place cut-out weights file into backend/storage/models directory.',
+    };
+    report.editService = {
+      status: editServiceOk ? 'ok' : 'missing',
+      connected: editServiceOk,
+      fixTip: 'Paste and save Edit service key in the Services tab.',
+    };
+    report.footageService = {
+      status: footageServiceOk ? 'ok' : 'missing',
+      connected: footageServiceOk,
+      fixTip: 'Paste and save Footage service key in the Services tab.',
+    };
+    report.storage = {
+      status: storageOk ? 'ok' : 'warning',
+      connected: storageOk,
+      freeGb: report.disk.freeGb,
+      totalGb: report.disk.totalGb,
+      warning: report.disk.warning,
+      fixTip: 'Clear temporary files in Storage and Backup tab.',
+    };
+    report.music = {
+      status: musicOk ? 'ok' : 'empty',
+      connected: musicOk,
+      trackCount: report.musicLibrary.trackCount,
+      fixTip: 'Upload audio files in the Music tab.',
+    };
 
     return report;
   }
@@ -387,6 +449,30 @@ print("OK")
       fileCount: filesToBackup.length,
       createdAt: now.toISOString(),
     };
+  }
+
+  public async listBackups(): Promise<BackupResult[]> {
+    const backendRoot = path.resolve(storageService.getBaseDir(), '..');
+    const backupsDir = path.join(backendRoot, 'backups');
+    if (!fs.existsSync(backupsDir)) return [];
+    try {
+      const files = fs.readdirSync(backupsDir).filter((f) => f.endsWith('.zip'));
+      return files
+        .map((fileName) => {
+          const filePath = path.join(backupsDir, fileName);
+          const stat = fs.statSync(filePath);
+          return {
+            fileName,
+            filePath,
+            sizeBytes: stat.size,
+            fileCount: 0,
+            createdAt: stat.mtime.toISOString(),
+          };
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+      return [];
+    }
   }
 
   private calculateDirStats(dirPath: string): { sizeBytes: number; projectCount: number } {

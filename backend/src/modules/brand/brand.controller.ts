@@ -96,6 +96,12 @@ export class BrandController {
     reply.header('Cache-Control', 'public, max-age=86400');
     return reply.send(stream);
   }
+
+  public async deleteLogo(_req: FastifyRequest, reply: FastifyReply) {
+    brandService.removeLogo();
+    const updatedKit = brandService.getBrandKit();
+    return reply.send({ success: true, data: updatedKit, message: 'Brand logo removed' });
+  }
 }
 
 export const brandController = new BrandController();

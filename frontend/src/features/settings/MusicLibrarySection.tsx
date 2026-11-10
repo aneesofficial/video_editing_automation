@@ -179,22 +179,20 @@ export const MusicLibrarySection: React.FC = () => {
             <Music className="w-5 h-5 text-violet-400" />
             <h3 className="text-base font-bold text-white">Royalty-Free Music Library</h3>
           </div>
-          <Badge variant="violet" className="bg-violet-500/10 text-violet-300 border-violet-500/30">
+          <Badge variant="accent">
             {tracks.length} {tracks.length === 1 ? 'Track' : 'Tracks'} Available
           </Badge>
         </div>
 
         <p className="text-xs text-studio-muted leading-relaxed">
-          Background music is matched automatically by Gemini based on your video mood prompt (or chosen
-          in the result screen) and rendered by FFmpeg with automatic speech ducking.
+          Background music is matched automatically based on your edit instructions and rendered with automatic speech ducking.
         </p>
 
-        <div className="p-3.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 flex items-start gap-2.5 text-emerald-300 text-xs">
+        <div className="p-3.5 rounded bg-emerald-950/20 border border-emerald-500/30 flex items-start gap-2.5 text-emerald-300 text-xs">
           <ShieldCheck className="w-4 h-4 flex-shrink-0 text-emerald-400 mt-0.5" />
           <div>
-            <span className="font-semibold text-emerald-200">Commercial Copyright Protection: </span>
-            Upload only royalty-free audio (e.g. YouTube Audio Library, Pixabay Music, FreePD). Commercial
-            copyrighted music will trigger YouTube/Meta content ID strikes.
+            <span className="font-semibold text-emerald-200">Royalty-Free Audio: </span>
+            Upload royalty-free music files for production use.
           </div>
         </div>
       </div>

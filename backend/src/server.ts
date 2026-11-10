@@ -16,12 +16,10 @@ async function main() {
     });
 
     console.log(`=================================================`);
-    console.log(`🚀 NovaCut Studio Backend running on http://${env.HOST}:${env.PORT}`);
-    console.log(`📡 Health check: http://localhost:${env.PORT}/api/health`);
-    console.log(`📁 Local Storage: ${env.STORAGE_DIR}`);
-    console.log(`🤖 AI Planner: Google Gemini (${env.GEMINI_MODEL})`);
-    console.log(`🎙️ Whisper Model: ${env.WHISPER_MODEL}`);
-    console.log(`⚡ Job Engine: In-Process Queue (Zero External Dependencies)`);
+    console.log(`Studio Backend running on http://${env.HOST}:${env.PORT}`);
+    console.log(`Health check: http://localhost:${env.PORT}/api/health`);
+    console.log(`Storage: ${env.STORAGE_DIR}`);
+    console.log(`Job Engine: Active`);
     console.log(`=================================================`);
 
     const shutdown = async (signal: string) => {

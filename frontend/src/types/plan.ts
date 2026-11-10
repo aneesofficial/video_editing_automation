@@ -5,7 +5,7 @@ export interface EditingPreferences {
   resolution: VideoResolution;
   frameRate: FrameRate;
   style: EditingStyle;
-  pacingDensity: number; // 1 to 5 (1: relaxed, 3: dynamic, 5: high energy / jump cut)
+  pacingDensity: number;
   cutSilences: boolean;
   generateCaptions: boolean;
   autoColorGrade: boolean;
@@ -13,7 +13,7 @@ export interface EditingPreferences {
   musicMood: 'upbeat' | 'chill' | 'cinematic' | 'corporate' | 'none';
 }
 
-export interface AIPromptPayload {
+export interface EditPromptPayload {
   projectId: string;
   userPrompt: string;
   preferences: EditingPreferences;
@@ -26,7 +26,9 @@ export interface AIPromptPayload {
   clientTimestamp: string;
 }
 
-export interface AIJobStatus {
+export type AIPromptPayload = EditPromptPayload;
+
+export interface EditJobStatus {
   jobId: string;
   status: 'offline' | 'queued' | 'analyzing' | 'cutting' | 'rendering' | 'completed' | 'failed';
   progressPercentage: number;
@@ -34,3 +36,4 @@ export interface AIJobStatus {
   error?: string;
 }
 
+export type AIJobStatus = EditJobStatus;

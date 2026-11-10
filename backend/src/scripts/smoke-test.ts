@@ -1,5 +1,5 @@
 /**
- * Unified NovaCut Studio Smoke Test Suite
+ * Unified Studio Smoke Test Suite
  *
  * Verifies:
  * 1. System Health (Database, FFmpeg, Python, Whisper, ONNX, Gemini, Pixabay, Disk)
@@ -24,7 +24,7 @@ const execFileAsync = promisify(execFile);
 
 async function runSmokeTest() {
   console.log('====================================================');
-  console.log('       NOVACUT STUDIO - UNIFIED SMOKE TEST          ');
+  console.log('         STUDIO - UNIFIED SMOKE TEST                ');
   console.log('====================================================\n');
 
   const startTime = Date.now();
@@ -40,15 +40,13 @@ async function runSmokeTest() {
     console.log('[STEP 1/3] Verifying System Health & External Integrations...');
     const health = await systemService.getHealth();
 
-    console.log(`  - Database:     ${health.database.status.toUpperCase()} (${health.database.message})`);
-    console.log(`  - FFmpeg:       ${health.ffmpeg.status.toUpperCase()} (${health.ffmpeg.version || 'OK'})`);
-    console.log(`  - Python:       ${health.python.status.toUpperCase()} (${health.python.version || 'OK'})`);
-    console.log(`  - Whisper:      ${health.whisper.status.toUpperCase()} (model: ${health.whisper.model})`);
-    console.log(`  - ONNX Model:   ${health.onnx.exists ? 'FOUND' : 'MISSING'} (${health.onnx.sizeMb ?? 0} MB)`);
-    console.log(`  - Gemini Key:   ${health.gemini.hasKey ? 'CONFIGURED (' + health.gemini.maskedKey + ')' : 'NOT SET'}`);
-    console.log(`  - Pixabay Key:  ${health.stock.pixabay.hasKey ? 'CONFIGURED (' + health.stock.pixabay.maskedKey + ')' : 'NOT SET'}`);
-    console.log(`  - Free Disk:    ${health.disk.freeGb} GB available (Total: ${health.disk.totalGb} GB)`);
-    console.log(`  - Music Tracks: ${health.musicLibrary.trackCount} available`);
+    console.log(`  - Video Engine:    ${health.videoEngine?.connected ? 'READY' : 'OFFLINE'}`);
+    console.log(`  - Speech:          ${health.speech?.connected ? 'READY' : 'OFFLINE'}`);
+    console.log(`  - Photo Cut-out:   ${health.photoCutout?.connected ? 'READY' : 'NOT FOUND'}`);
+    console.log(`  - Edit Service:    ${health.editService?.connected ? 'CONNECTED' : 'NOT SET'}`);
+    console.log(`  - Footage Service: ${health.footageService?.connected ? 'CONNECTED' : 'NOT SET'}`);
+    console.log(`  - Storage:         ${health.storage?.connected ? 'OK' : 'WARNING'} (${health.disk.freeGb} GB free)`);
+    console.log(`  - Music:           ${health.music?.connected ? 'READY' : 'EMPTY'} (${health.music?.trackCount ?? 0} tracks)`);
 
     if (health.database.status !== 'ok') {
       throw new Error(`Database check failed: ${health.database.message}`);
@@ -59,7 +57,7 @@ async function runSmokeTest() {
     if (health.python.status !== 'ok') {
       throw new Error(`Python check failed: ${health.python.message}`);
     }
-    console.log('✓ STEP 1 PASSED: Core system health is 100% operational.\n');
+    console.log('[PASS] STEP 1 PASSED: Core system health is operational.\n');
 
     // ----------------------------------------------------
     // 2. Photo Edit Verification (1 Photo)
@@ -125,7 +123,7 @@ print("CREATED")
     console.log(`  - Output:       ${photoResult.width}x${photoResult.height} (${photoResult.format})`);
     console.log(`  - File Size:    ${(photoStat.size / 1024).toFixed(1)} KB`);
     console.log(`  - Version:      ${photoResult.version}`);
-    console.log('✓ STEP 2 PASSED: Photo editing engine processed image successfully.\n');
+    console.log('[PASS] STEP 2 PASSED: Photo editing engine processed image successfully.\n');
 
     // Clean up photo output directory after test
     try {
@@ -204,7 +202,7 @@ print("CREATED")
     console.log(`  - Duration:     ${probe.duration.toFixed(2)}s`);
     console.log(`  - Codec:        ${probe.videoCodec || 'h264'}`);
     console.log(`  - File Size:    ${(fs.statSync(smokeRenderOut).size / 1024).toFixed(1)} KB`);
-    console.log('✓ STEP 3 PASSED: Video render engine completed draft render with valid video stream.\n');
+    console.log('[PASS] STEP 3 PASSED: Video render engine completed draft render with valid video stream.\n');
 
     // ----------------------------------------------------
     // Cleanup temporary test artifacts
@@ -227,15 +225,15 @@ print("CREATED")
     } catch {}
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log('====================================================');
-    console.log(`🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY IN ${elapsed}s!`);
-    console.log('   - Health Check:    PASS');
-    console.log('   - 1 Photo Edit:    PASS');
-    console.log('   - 1 Draft Render:  PASS');
-    console.log('====================================================');
-    process.exit(0);
-  } catch (err: any) {
-    console.error('\n❌ SMOKE TEST FAILED:', err.message);
+  console.log('====================================================');
+  console.log(`[PASS] ALL SMOKE TESTS PASSED SUCCESSFULLY IN ${elapsed}s!`);
+  console.log('   - Health Check:    PASS');
+  console.log('   - 1 Photo Edit:    PASS');
+  console.log('   - 1 Draft Render:  PASS');
+  console.log('====================================================');
+  process.exit(0);
+} catch (err: any) {
+  console.error('\n[FAIL] SMOKE TEST FAILED:', err.message);
     if (err.stack) console.error(err.stack);
 
     // Clean up on failure

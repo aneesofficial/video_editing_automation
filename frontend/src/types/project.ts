@@ -1,4 +1,4 @@
-import { EditingPreferences } from './ai';
+import { EditingPreferences } from './plan';
 import { VideoMetadata } from './video';
 
 export type ProjectStatus = 'draft' | 'ready' | 'processing' | 'completed' | 'failed';

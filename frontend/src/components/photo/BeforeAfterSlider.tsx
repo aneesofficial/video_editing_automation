@@ -84,8 +84,11 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
         }}
       >
         <div className="w-0.5 h-full bg-white shadow-[0_0_8px_rgba(0,0,0,0.8)]" />
-        <div className="absolute w-8 h-8 rounded-full bg-white shadow-lg border border-studio-border flex items-center justify-center text-zinc-900 font-bold text-xs select-none">
-          ◂▸
+        <div className="absolute w-7 h-7 rounded-full bg-white shadow-lg border border-studio-border flex items-center justify-center text-zinc-900 select-none">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 3 12 9 6" />
+            <polyline points="15 6 21 12 15 18" />
+          </svg>
         </div>
       </div>
 

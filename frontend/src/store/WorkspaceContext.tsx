@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { AspectRatio, EditingStyle, FrameRate, VideoMetadata, VideoResolution } from '../types/video';
-import { EditingPreferences } from '../types/ai';
+import { EditingPreferences } from '../types/plan';
 import { TimelineClip, TimelineTrack } from '../types/timeline';
 import { Project } from '../types/project';
 import { ProjectMediaItem, UploadQueueItem } from '../types/media';
@@ -120,7 +120,7 @@ const DEFAULT_TRACKS: TimelineTrack[] = [
   { id: 'track-v2', name: 'V2 • B-Roll & Visuals', type: 'b-roll', isMuted: false, isLocked: false, isVisible: true, clips: [] },
   { id: 'track-a1', name: 'A1 • Dialogue Audio', type: 'audio-dialogue', isMuted: false, isLocked: false, isVisible: true, clips: [] },
   { id: 'track-a2', name: 'A2 • Music & Sound FX', type: 'audio-music', isMuted: false, isLocked: false, isVisible: true, clips: [] },
-  { id: 'track-txt', name: 'TXT • AI Captions', type: 'captions', isMuted: false, isLocked: false, isVisible: true, clips: [] },
+  { id: 'track-txt', name: 'TXT • Captions', type: 'captions', isMuted: false, isLocked: false, isVisible: true, clips: [] },
 ];
 
 const WorkspaceContext = createContext<WorkspaceContextType | null>(null);
@@ -361,7 +361,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       { id: 'track-v2', name: 'V2 • B-Roll & Visuals', type: 'b-roll', isMuted: false, isLocked: false, isVisible: true, clips: [] },
       { id: 'track-a1', name: 'A1 • Dialogue Audio', type: 'audio-dialogue', isMuted: false, isLocked: false, isVisible: true, clips: [] },
       { id: 'track-a2', name: 'A2 • Music & Sound FX', type: 'audio-music', isMuted: false, isLocked: false, isVisible: true, clips: [] },
-      { id: 'track-txt', name: 'TXT • AI Captions', type: 'captions', isMuted: false, isLocked: false, isVisible: true, clips: [] },
+      { id: 'track-txt', name: 'TXT • Captions', type: 'captions', isMuted: false, isLocked: false, isVisible: true, clips: [] },
     ]);
   };
 
@@ -840,7 +840,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const generateMissingPreviews = async (projectId?: string) => {
     setIsPreviewLoading(true);
-    setPreviewStatusMessage('Regenerating browser-friendly previews with FFmpeg...');
+    setPreviewStatusMessage('Preparing browser-friendly previews in background...');
     setPreviewError(null);
     try {
       const targetId = projectId || currentProjectId || undefined;
@@ -901,7 +901,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const videoClips: TimelineClip[] = plan.clips.map((c, i) => {
       const clipDuration = (c.sourceOut - c.sourceIn) / (c.speed || 1.0);
       const clip: TimelineClip = {
-        id: `ai-clip-${i}-${Date.now()}`,
+        id: `clip-${i}-${Date.now()}`,
         trackId: 'track-v1',
         title: `Scene ${i + 1} (${c.sourceIn.toFixed(1)}s - ${c.sourceOut.toFixed(1)}s)`,
         startTime: cursor,
@@ -916,7 +916,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     const captionClips: TimelineClip[] = (plan.captions || []).map((cap, i) => ({
-      id: `ai-cap-${i}-${Date.now()}`,
+      id: `cap-${i}-${Date.now()}`,
       trackId: 'track-txt',
       title: cap.text,
       startTime: cap.startTime,

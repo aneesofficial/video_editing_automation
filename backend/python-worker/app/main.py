@@ -21,7 +21,7 @@ from app.photo.analyzer import analyze_photo
 from app.photo.processor import process_photo
 
 def main():
-    parser = argparse.ArgumentParser(description="NovaCut Python Worker CLI")
+    parser = argparse.ArgumentParser(description="Studio Python Worker CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Subcommand: scenes

@@ -62,7 +62,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get('/health', async () => {
     return {
       status: 'ok',
-      service: 'NovaCut Studio Backend',
+      service: 'Studio Backend',
       version: '1.0.0',
       timestamp: new Date().toISOString(),
     };
@@ -81,6 +81,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await v1.register(uploadRoutes, { prefix: '/uploads' });
       await v1.register(mediaRoutes, { prefix: '/media' });
       await v1.register(aiRoutes, { prefix: '/ai' });
+      await v1.register(aiRoutes, { prefix: '/service' });
       await v1.register(aiDirectorRoutes, { prefix: '/ai-director' });
       await v1.register(editingRoutes, { prefix: '/editing' });
       await v1.register(renderingRoutes, { prefix: '/rendering' });

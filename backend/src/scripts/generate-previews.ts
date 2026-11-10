@@ -6,7 +6,7 @@ import { storageService } from '../services/storage/storage.service.js';
 
 async function main() {
   console.log('==================================================');
-  console.log('🎬 NovaCut Studio - Universal Preview Generator');
+  console.log('Universal Preview Generator');
   console.log('==================================================\n');
 
   const mediaAssets = await prisma.mediaAsset.findMany({
@@ -51,7 +51,7 @@ async function main() {
     console.log(`[GENERATING] Generating preview for ${asset.filename} (${projectName})...`);
     try {
       const info = await previewService.processMediaPreview(asset.id);
-      console.log(`  ✓ Successfully created preview: ${info.previewPath}`);
+      console.log(`  [OK] Successfully created preview: ${info.previewPath}`);
       summary.push({
         id: asset.id,
         filename: asset.filename,
@@ -60,7 +60,7 @@ async function main() {
         previewFile: info.previewPath || 'unknown',
       });
     } catch (err: any) {
-      console.error(`  ✗ Failed to create preview for ${asset.filename}:`, err?.message || err);
+      console.error(`  [FAIL] Failed to create preview for ${asset.filename}:`, err?.message || err);
       summary.push({
         id: asset.id,
         filename: asset.filename,

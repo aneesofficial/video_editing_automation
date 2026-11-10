@@ -514,12 +514,9 @@ export const renderWorker = new Worker<RenderJobData>(
         backgroundMusic: backgroundMusicOptions,
         bRollCutaways: bRollCutaways.length > 0 ? bRollCutaways : undefined,
         onProgress: async (p) => {
-          let msg = `Rendering ${qualityMode.toUpperCase()} video (${p.percent}%)`;
+          let msg = `Rendering video (${p.percent}%)`;
           if (p.etaSeconds !== undefined) {
-            msg += ` • ETA ~${p.etaSeconds}s`;
-          }
-          if (p.speed) {
-            msg += ` • speed: ${p.speed}`;
+            msg += ` (ETA ~${p.etaSeconds}s)`;
           }
           await logEvent('Encoding', p.percent, msg, {
             etaSeconds: p.etaSeconds,
@@ -574,7 +571,7 @@ export const renderWorker = new Worker<RenderJobData>(
       if (silenceRemovalEnabled) featureBadges.push('Silence Cut');
       const featuresStr = featureBadges.length > 0 ? ` • [${featureBadges.join(', ')}]` : '';
 
-      const qualityBadgeText = `${qualityMode.toUpperCase()} (${renderResult.resolution}) • Plan ${activePlanVersionTag} • ${renderResult.encoderUsed}${featuresStr}`;
+      const qualityBadgeText = `${qualityMode.toUpperCase()} (${renderResult.resolution}) • Version ${activePlanVersionTag}${featuresStr}`;
 
       await prisma.projectVersion.create({
         data: {

@@ -1,4 +1,4 @@
-// Prisma schema for NovaCut Studio AI Video Editor
+// Prisma schema for Studio Video Editor
 // Compatible with SQLite (development/local) and PostgreSQL (production)
 
 generator client {

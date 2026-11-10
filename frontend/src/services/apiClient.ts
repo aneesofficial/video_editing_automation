@@ -1,4 +1,4 @@
-import { AIPromptPayload, AIJobStatus } from '../types/ai';
+import { EditPromptPayload as AIPromptPayload, EditJobStatus as AIJobStatus } from '../types/plan';
 import { Client, ProjectVersion } from '../types/project';
 
 export interface BackendHealthResponse {
@@ -7,14 +7,16 @@ export interface BackendHealthResponse {
   message: string;
   latencyMs?: number;
   engineVersion?: string;
+  error?: string;
+  rawReport?: any;
 }
 
 export interface AIStatusResponse {
   online: boolean;
-  model: string;
-  hasKey: boolean;
-  maskedKey: string | null;
-  visionEnabled: boolean;
+  hasKey?: boolean;
+  visionEnabled?: boolean;
+  model?: string;
+  maskedKey?: string | null;
   whisperModel?: string;
   whisperLanguage?: string;
   reason?: string | null;
@@ -53,18 +55,17 @@ export interface SystemHealthReport {
   timestamp: string;
   service: string;
   version: string;
-  database: { status: string; message: string };
-  ffmpeg: { status: string; message: string; version?: string; path: string };
-  python: { status: string; message: string; version?: string; path: string };
-  whisper: { status: string; model: string };
-  onnx: { status: string; model: string; exists: boolean; sizeMb?: number };
-  gemini: { status: string; model: string; hasKey: boolean; maskedKey: string | null };
-  stock: {
-    pexels: { hasKey: boolean; maskedKey: string | null; configured: boolean };
-    pixabay: { hasKey: boolean; maskedKey: string | null; configured: boolean };
-  };
-  disk: { freeGb: number; totalGb: number; warning: boolean };
-  musicLibrary: { trackCount: number };
+  videoEngine?: { status: string; connected: boolean; fixTip?: string };
+  speech?: { status: string; connected: boolean; fixTip?: string };
+  photoCutout?: { status: string; connected: boolean; fixTip?: string };
+  editService?: { status: string; connected: boolean; fixTip?: string };
+  footageService?: { status: string; connected: boolean; fixTip?: string };
+  storage?: { status: string; connected: boolean; freeGb?: number; totalGb?: number; warning?: boolean; fixTip?: string };
+  music?: { status: string; connected: boolean; trackCount?: number; fixTip?: string };
+  database?: { status: string; message: string };
+  python?: { status: string; message: string; version?: string; path: string };
+  disk?: { freeGb: number; totalGb: number; warning: boolean };
+  musicLibrary?: { trackCount: number };
 }
 
 export interface ClientStorageInfo {
@@ -500,12 +501,19 @@ class ApiClient {
 
       if (response.ok) {
         const data = await response.json();
+        let rawReport = null;
+        try {
+          const sysRes = await fetch(`${this.baseUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
+          if (sysRes.ok) rawReport = await sysRes.json();
+        } catch {}
+
         return {
           connected: true,
           status: 'healthy',
-          message: data.service || 'NovaCut Engine Online',
+          message: data.service || 'Studio Engine Online',
           latencyMs,
           engineVersion: data.version || 'v1.0.0',
+          rawReport,
         };
       }
 
@@ -513,6 +521,7 @@ class ApiClient {
         connected: false,
         status: 'unreachable',
         message: `Backend returned status ${response.status}`,
+        error: `Backend returned status ${response.status}`,
         latencyMs,
       };
     } catch (err: unknown) {
@@ -521,6 +530,7 @@ class ApiClient {
         connected: false,
         status: 'offline',
         message: `Backend offline (${this.baseUrl}): ${message}. Ensure backend is running.`,
+        error: message,
       };
     }
   }
@@ -670,41 +680,7 @@ class ApiClient {
     return this.uploadMediaFile(projectId, file);
   }
 
-  /**
-   * AI Director
-   */
-  async submitAIEditingJob(payload: AIPromptPayload): Promise<{ jobId: string }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/ai-director/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        projectId: payload.projectId || 'default',
-        userPrompt: payload.userPrompt,
-        editingStyle: payload.preferences?.style || 'dynamic',
-        targetDuration: payload.preferences?.pacingDensity ? 30 : undefined,
-        removeSilences: payload.preferences?.cutSilences ?? true,
-        autoColorGrade: payload.preferences?.autoColorGrade ?? false,
-        autoDenoise: false,
-        captionStyle: payload.preferences?.generateCaptions ? 'standard' : 'none',
-      }),
-    });
 
-    if (!res.ok) throw new Error(`AI Job submission failed: ${res.statusText}`);
-    const json = await res.json();
-    return { jobId: json.data?.instructionId || '' };
-  }
-
-  async getInstructionStatus(id: string) {
-    const res = await fetch(`${this.baseUrl}/api/v1/ai-director/instructions/${id}`);
-    if (!res.ok) throw new Error(`Failed to get instruction: ${res.statusText}`);
-    return res.json();
-  }
-
-  async getProjectPlan(projectId: string) {
-    const res = await fetch(`${this.baseUrl}/api/v1/ai-director/projects/${projectId}/plan`);
-    if (!res.ok) return null;
-    return res.json();
-  }
 
   /**
    * Rendering
@@ -824,26 +800,26 @@ class ApiClient {
     return res.json();
   }
 
-  // --- Gemini AI Planner Methods ---
+  // --- Edit Planner Methods ---
 
   async getAiStatus(): Promise<AIStatusResponse> {
-    const res = await fetch(`${this.baseUrl}/api/v1/ai/status`);
+    const res = await fetch(`${this.baseUrl}/api/v1/service/status`);
     if (!res.ok) {
-      throw new Error(`Failed to fetch AI status: ${res.statusText}`);
+      throw new Error(`Failed to fetch service status: ${res.statusText}`);
     }
     const json = await res.json();
     return json.data;
   }
 
   async saveAiKey(apiKey: string): Promise<{ success: boolean; maskedKey?: string; error?: string }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/ai/key`, {
+    const res = await fetch(`${this.baseUrl}/api/v1/service/key`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey }),
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to save Gemini API key');
+      throw new Error(json.error || 'Failed to save key');
     }
     return json;
   }
@@ -852,14 +828,14 @@ class ApiClient {
     options: boolean | { visionEnabled?: boolean; whisperModel?: string; whisperLanguage?: string }
   ): Promise<AIStatusResponse> {
     const payload = typeof options === 'boolean' ? { visionEnabled: options } : options;
-    const res = await fetch(`${this.baseUrl}/api/v1/ai/settings`, {
+    const res = await fetch(`${this.baseUrl}/api/v1/service/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to update AI settings');
+      throw new Error(json.error || 'Failed to update settings');
     }
     return json.data;
   }
@@ -965,14 +941,14 @@ class ApiClient {
       autoBRoll?: boolean;
     }
   ): Promise<{ success: boolean; data: { plan: GeminiEditingPlan; planId: string; version: string; filePath: string } }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/ai-plan`, {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/edit-plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to generate AI plan');
+      throw new Error(json.error || 'Failed to generate edit plan');
     }
     return json;
   }
@@ -1090,21 +1066,21 @@ class ApiClient {
   // --- Step 8: Stock Media Endpoints ---
 
   async getStockStatus(): Promise<StockStatusResponse> {
-    const res = await fetch(`${this.baseUrl}/api/v1/stock/status`);
-    if (!res.ok) throw new Error(`Failed to get stock status: ${res.statusText}`);
+    const res = await fetch(`${this.baseUrl}/api/v1/footage/status`);
+    if (!res.ok) throw new Error(`Failed to get footage status: ${res.statusText}`);
     const json = await res.json();
     return json.data;
   }
 
   async testStockKey(provider: 'pexels' | 'pixabay', key: string): Promise<{ valid: boolean; error?: string }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/stock/test-key`, {
+    const res = await fetch(`${this.baseUrl}/api/v1/footage/test-key`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, key }),
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || `Failed to test ${provider} key`);
+      throw new Error(json.error || `Failed to test footage key`);
     }
     return json.data;
   }
@@ -1113,14 +1089,14 @@ class ApiClient {
     pexels: { valid: boolean; error?: string; maskedKey: string | null };
     pixabay: { valid: boolean; error?: string; maskedKey: string | null };
   }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/stock/keys`, {
+    const res = await fetch(`${this.baseUrl}/api/v1/footage/keys`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(keys),
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to save stock API keys');
+      throw new Error(json.error || 'Failed to save footage keys');
     }
     return json.data;
   }
@@ -1141,10 +1117,10 @@ class ApiClient {
     if (options.page) params.set('page', String(options.page));
     if (options.perPage) params.set('perPage', String(options.perPage));
 
-    const res = await fetch(`${this.baseUrl}/api/v1/stock/search?${params.toString()}`);
+    const res = await fetch(`${this.baseUrl}/api/v1/footage/search?${params.toString()}`);
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Stock search failed');
+      throw new Error(json.error || 'Footage search failed');
     }
     return json.data;
   }
@@ -1153,14 +1129,14 @@ class ApiClient {
     projectId: string,
     stockItem: StockItem
   ): Promise<{ asset: any; license: StockLicenseMeta }> {
-    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/stock/import`, {
+    const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/footage/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stockItem }),
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
-      throw new Error(json.error || 'Failed to import stock media');
+      throw new Error(json.error || 'Failed to import footage');
     }
     return json.data;
   }
@@ -1187,14 +1163,18 @@ class ApiClient {
     return json.data;
   }
 
-  async cleanCache(): Promise<{ freedMb: number; cleanedFilesCount: number }> {
+  async cleanCache(): Promise<{ freedMb: number; cleanedFilesCount: number; deletedFiles?: number }> {
     const res = await fetch(`${this.baseUrl}/api/v1/system/clean-cache`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
     const json = await res.json();
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to clean cache');
-    return json.data;
+    return {
+      freedMb: json.data?.freedMb || 0,
+      cleanedFilesCount: json.data?.cleanedFilesCount || 0,
+      deletedFiles: json.data?.cleanedFilesCount || 0,
+    };
   }
 
   async createBackup(): Promise<BackupResult> {
@@ -1205,6 +1185,88 @@ class ApiClient {
     const json = await res.json();
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to create backup');
     return json.data;
+  }
+
+  async listBackups(): Promise<BackupResult[]> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/system/backups`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async deleteBrandLogo(): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/api/v1/brand/logo`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete brand logo');
+  }
+
+  // Aliases for clean Step 13A UI
+  async startRender(
+    projectId: string,
+    options: {
+      qualityMode?: 'draft' | 'final';
+      planVersion?: string;
+      captions?: boolean;
+      captionStyle?: 'viral' | 'clean' | 'minimal';
+      music?: boolean;
+      musicMood?: string;
+      useBrandKit?: boolean;
+      silenceRemoval?: boolean;
+    }
+  ): Promise<{ jobId: string }> {
+    return this.createRenderJob(projectId, {
+      mode: options.qualityMode || 'draft',
+      planVersion: options.planVersion,
+      options: {
+        captions: options.captions,
+        captionStyle: options.captionStyle,
+        music: options.music,
+        musicMood: options.musicMood,
+        useBrandKit: options.useBrandKit,
+        silenceRemoval: options.silenceRemoval,
+      },
+    });
+  }
+
+  async getRenderStatus(jobId: string) {
+    return this.getRenderJob(jobId);
+  }
+
+  async listProjectVersions(projectId: string): Promise<ProjectVersion[]> {
+    return this.listVersions(projectId);
+  }
+
+  async generateAIPlan(
+    projectId: string,
+    payload: {
+      prompt: string;
+      targetPlatform?: string;
+      aspectRatio?: string;
+      resolution?: string;
+      enableStockBRoll?: boolean;
+      cutSilences?: boolean;
+      generateCaptions?: boolean;
+      backgroundMusic?: boolean;
+    }
+  ) {
+    return this.generateAiPlan(projectId, {
+      userPrompt: payload.prompt,
+      targetPlatform: payload.targetPlatform,
+      aspectRatio: payload.aspectRatio,
+      resolution: payload.resolution,
+      autoBRoll: payload.enableStockBRoll,
+    });
+  }
+
+  async getAIStatus(): Promise<AIStatusResponse> {
+    return this.getAiStatus();
+  }
+
+  async saveAIKey(apiKey: string): Promise<{ success: boolean; maskedKey?: string; error?: string }> {
+    return this.saveAiKey(apiKey);
   }
 }
 

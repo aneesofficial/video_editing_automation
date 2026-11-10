@@ -14,18 +14,22 @@ export const SaveSettingsSchema = z.object({
 
 export class AIController {
   /**
-   * GET /api/v1/ai/status
+   * GET /api/v1/ai/status and /api/v1/service/status
    */
   public async getStatus(_req: FastifyRequest, reply: FastifyReply) {
     const status = await geminiPlannerService.checkStatus();
     return reply.send({
       success: true,
-      data: status,
+      data: {
+        online: Boolean(status.online),
+        hasKey: Boolean(status.hasKey),
+        visionEnabled: Boolean(status.visionEnabled),
+      },
     });
   }
 
   /**
-   * POST /api/v1/ai/key
+   * POST /api/v1/ai/key and /api/v1/service/key
    */
   public async testAndSaveKey(
     req: FastifyRequest<{ Body: z.infer<typeof SaveKeySchema> }>,
@@ -35,7 +39,7 @@ export class AIController {
     if (!parsed.success) {
       return reply.status(400).send({
         success: false,
-        error: 'Please provide a valid non-empty Gemini API key.',
+        error: 'Please provide a valid key.',
       });
     }
 
@@ -45,7 +49,7 @@ export class AIController {
     if (!result.success) {
       return reply.status(400).send({
         success: false,
-        error: result.error || 'Failed to verify Gemini API key.',
+        error: 'Failed to verify edit service key.',
       });
     }
 
@@ -53,8 +57,11 @@ export class AIController {
 
     return reply.send({
       success: true,
-      message: 'Gemini API key verified and saved in backend/.env',
-      data: status,
+      message: 'Edit service key verified and saved.',
+      data: {
+        online: Boolean(status.online),
+        hasKey: Boolean(status.hasKey),
+      },
     });
   }
 

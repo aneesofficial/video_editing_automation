@@ -1,5 +1,5 @@
 """
-NovaCut Photo Analyzer
+Photo Analyzer
 Performs local, fast image analysis using OpenCV and Pillow:
 - Dimensions and aspect ratio
 - Average brightness (0-255)

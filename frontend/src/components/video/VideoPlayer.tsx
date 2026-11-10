@@ -18,7 +18,11 @@ import {
 import { useWorkspace } from '../../store/WorkspaceContext';
 import { formatTimecode } from '../../utils/formatters';
 
-export const VideoPlayer: React.FC = () => {
+interface VideoPlayerProps {
+  src?: string;
+}
+
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ src }) => {
   const {
     videoUrl,
     videoMetadata,
@@ -149,7 +153,7 @@ export const VideoPlayer: React.FC = () => {
             <div className="space-y-1">
               <p className="text-sm font-semibold text-white">Preparing preview...</p>
               <p className="text-xs text-studio-muted max-w-sm">
-                {previewStatusMessage || 'Converting to browser-safe format with FFmpeg in background...'}
+                {previewStatusMessage || 'Converting to browser-safe format in background...'}
               </p>
             </div>
           </div>
@@ -165,16 +169,16 @@ export const VideoPlayer: React.FC = () => {
           </div>
         ) : videoUrl ? (
           <div className={`relative w-full transition-all duration-300 flex items-center justify-center ${getAspectRatioClasses()}`}>
-            {isPhoto ? (
+            {isPhoto && !src ? (
               <img
                 src={videoUrl}
-                alt="Photo Preview"
+                alt=""
                 className="w-full h-full object-contain rounded shadow-2xl"
               />
             ) : (
               <video
                 ref={registerVideoElement}
-                src={videoUrl}
+                src={src || videoUrl}
                 playsInline
                 onClick={togglePlay}
                 className="w-full h-full object-contain cursor-pointer rounded shadow-2xl"

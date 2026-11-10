@@ -1,9 +1,11 @@
-import { BackendConfig, ExportDefaults, UserProfile, WorkspacePreferences } from '../types/settings';
+import { BackendConfig, EditDefaults, ExportDefaults, UserProfile, WorkspacePreferences } from '../types/settings';
 
-const SETTINGS_KEY = 'novacut_settings_v1';
+const SETTINGS_KEY = 'studio_settings_v1';
+const LEGACY_KEY = 'settings_v1';
 
 export interface AppSettings {
   profile: UserProfile;
+  editDefaults: EditDefaults;
   exportDefaults: ExportDefaults;
   workspacePreferences: WorkspacePreferences;
   backendConfig: BackendConfig;
@@ -16,6 +18,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
     avatarInitials: '',
     role: '',
     workspaceName: '',
+  },
+  editDefaults: {
+    captions: true,
+    captionStyle: 'clean',
+    music: false,
+    musicMood: 'chill',
+    logo: false,
+    silenceRemoval: true,
+    speechAccuracy: 'standard',
+    speechLanguage: 'auto',
   },
   exportDefaults: {
     format: 'mp4',
@@ -47,7 +59,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export const settingsStorage = {
   get(): AppSettings {
     try {
-      const data = localStorage.getItem(SETTINGS_KEY);
+      const data = localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(LEGACY_KEY);
       if (!data) return DEFAULT_SETTINGS;
       const parsed = JSON.parse(data);
       const config = { ...DEFAULT_SETTINGS.backendConfig, ...(parsed.backendConfig || {}) };
@@ -55,16 +67,12 @@ export const settingsStorage = {
         config.apiUrl = 'http://localhost:3001';
       }
       const profile = { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) };
-      if (profile.name === 'Creative Director') profile.name = '';
-      if (profile.email === 'creator@novacut.internal') profile.email = '';
-      if (profile.role === 'Editor & Producer') profile.role = '';
-      if (profile.workspaceName === 'Main Production Studio') profile.workspaceName = '';
-      if (profile.avatarInitials === 'CD') profile.avatarInitials = '';
 
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
         profile,
+        editDefaults: { ...DEFAULT_SETTINGS.editDefaults, ...(parsed.editDefaults || {}) },
         exportDefaults: { ...DEFAULT_SETTINGS.exportDefaults, ...(parsed.exportDefaults || {}) },
         workspacePreferences: { ...DEFAULT_SETTINGS.workspacePreferences, ...(parsed.workspacePreferences || {}) },
         backendConfig: config,
@@ -78,8 +86,17 @@ export const settingsStorage = {
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (e) {
-      console.error('Failed to save settings:', e);
+      console.error('Failed to save settings to localStorage:', e);
     }
   },
-};
 
+  reset(): AppSettings {
+    try {
+      localStorage.removeItem(SETTINGS_KEY);
+      localStorage.removeItem(LEGACY_KEY);
+    } catch (e) {
+      console.error('Failed to clear settings:', e);
+    }
+    return DEFAULT_SETTINGS;
+  },
+};

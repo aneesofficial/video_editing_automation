@@ -258,7 +258,29 @@ export class FFmpegService {
       '-maxrate',
       '2500k',
       '-bufsize',
-      '3500k'
+      '3500k',
+      '-x264-params',
+      'no-info=1',
+      '-map_metadata',
+      '-1',
+      '-fflags',
+      '+bitexact',
+      '-flags:v',
+      '+bitexact',
+      '-flags:a',
+      '+bitexact',
+      '-metadata',
+      'handler_name=',
+      '-metadata',
+      'encoder=',
+      '-metadata:s:v',
+      'handler_name=',
+      '-metadata:s:v',
+      'encoder=',
+      '-metadata:s:a',
+      'handler_name=',
+      '-metadata:s:a',
+      'encoder='
     );
 
     args.push('-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2');
@@ -865,6 +887,22 @@ export class FFmpegService {
       args.push('-c:a', 'aac', '-b:a', '192k');
     }
 
+    if (encoder === 'libx264') {
+      args.push('-x264-params', 'no-info=1');
+    }
+
+    // Strip tool names and metadata from exported file
+    args.push('-map_metadata', '-1');
+    args.push('-fflags', '+bitexact');
+    args.push('-flags:v', '+bitexact');
+    args.push('-flags:a', '+bitexact');
+    args.push('-metadata', 'handler_name=');
+    args.push('-metadata', 'encoder=');
+    args.push('-metadata:s:v', 'handler_name=');
+    args.push('-metadata:s:v', 'encoder=');
+    args.push('-metadata:s:a', 'handler_name=');
+    args.push('-metadata:s:a', 'encoder=');
+
     args.push('-pix_fmt', 'yuv420p');
     args.push('-movflags', '+faststart');
     args.push('-metadata:s:v:0', 'rotate=0');
@@ -872,7 +910,7 @@ export class FFmpegService {
     args.push('-progress', 'pipe:1');
     args.push(outputPath);
 
-    console.log(`[FFmpegService] Executing plan render job ${jobId} using encoder ${encoder} (script: ${scriptPath})`);
+    console.log(`[VideoEngine] Executing plan render job ${jobId} using encoder ${encoder} (script: ${scriptPath})`);
 
     // 7. Spawn Process and Track Progress
     return new Promise<PlanRenderResult>((resolve, reject) => {
@@ -1100,12 +1138,23 @@ export class FFmpegService {
     args.push('-map', finalVideoTag);
     args.push('-map', finalAudioTag);
     args.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '22', '-pix_fmt', 'yuv420p');
+    args.push('-x264-params', 'no-info=1');
+    args.push('-map_metadata', '-1');
+    args.push('-fflags', '+bitexact');
+    args.push('-flags:v', '+bitexact');
+    args.push('-flags:a', '+bitexact');
+    args.push('-metadata', 'handler_name=');
+    args.push('-metadata', 'encoder=');
+    args.push('-metadata:s:v', 'handler_name=');
+    args.push('-metadata:s:v', 'encoder=');
+    args.push('-metadata:s:a', 'handler_name=');
+    args.push('-metadata:s:a', 'encoder=');
     args.push('-c:a', 'aac', '-b:a', '192k');
     args.push('-t', totalDuration.toString());
     args.push('-progress', 'pipe:1');
     args.push(outputPath);
 
-    onProgress?.(25, 'Encoding video with FFmpeg');
+    onProgress?.(25, 'Encoding video preview');
 
     return new Promise((resolve, reject) => {
       const child = spawn(env.FFMPEG_PATH, args);

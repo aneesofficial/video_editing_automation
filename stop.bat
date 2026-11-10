@@ -1,9 +1,9 @@
 @echo off
-title NovaCut Studio Stopper
+title Studio Stopper
 cd /d "%~dp0"
 
 echo ===================================================
-echo           STOPPING NOVACUT STUDIO
+echo               STOPPING STUDIO
 echo ===================================================
 echo.
 
@@ -18,6 +18,6 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5173" ^| findstr "LISTENING
 )
 
 echo.
-echo All NovaCut Studio servers have been stopped.
+echo All Studio servers have been stopped.
 ping -n 3 127.0.0.1 >nul
 

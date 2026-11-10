@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppSettings, settingsStorage } from '../services/settingsStorage';
 import { apiClient } from '../services/apiClient';
-import { BackendConfig, ExportDefaults, UserProfile, WorkspacePreferences } from '../types/settings';
+import { BackendConfig, EditDefaults, ExportDefaults, UserProfile, WorkspacePreferences } from '../types/settings';
 
 interface SettingsContextType {
   settings: AppSettings;
   updateProfile: (profile: Partial<UserProfile>) => void;
+  updateEditDefaults: (defaults: Partial<EditDefaults>) => void;
   updateExportDefaults: (defaults: Partial<ExportDefaults>) => void;
   updatePreferences: (prefs: Partial<WorkspacePreferences>) => void;
   updateBackendConfig: (config: Partial<BackendConfig>) => void;
@@ -27,6 +28,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateProfile = (profile: Partial<UserProfile>) => {
     setSettings((prev) => {
       const updated = { ...prev, profile: { ...prev.profile, ...profile } };
+      settingsStorage.save(updated);
+      return updated;
+    });
+  };
+
+  const updateEditDefaults = (defaults: Partial<EditDefaults>) => {
+    setSettings((prev) => {
+      const updated = { ...prev, editDefaults: { ...prev.editDefaults, ...defaults } };
       settingsStorage.save(updated);
       return updated;
     });
@@ -71,9 +80,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
     } else {
       updateBackendConfig({
-        status: 'disconnected',
+        status: 'error',
         lastCheckedAt: now,
-        errorMessage: result.message,
+        errorMessage: result.error || 'Connection failed',
       });
     }
 
@@ -85,6 +94,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         settings,
         updateProfile,
+        updateEditDefaults,
         updateExportDefaults,
         updatePreferences,
         updateBackendConfig,

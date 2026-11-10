@@ -90,15 +90,16 @@ const EXAMPLE_PROMPTS = [
 ];
 
 interface PhotoEditingWorkspaceProps {
-  projectId: string;
+  projectId?: string;
   onPhotoImportedToVideo?: () => void;
 }
 
 export const PhotoEditingWorkspace: React.FC<PhotoEditingWorkspaceProps> = ({
-  projectId,
+  projectId: propProjectId,
   onPhotoImportedToVideo,
 }) => {
-  const { mediaItems, uploadMultipleFiles, uploadQueue } = useWorkspace();
+  const { currentProjectId, mediaItems, uploadMultipleFiles, uploadQueue } = useWorkspace();
+  const projectId = propProjectId || currentProjectId || '';
 
   // Filter project photos
   const photoAssets = mediaItems.filter(
@@ -199,7 +200,7 @@ export const PhotoEditingWorkspace: React.FC<PhotoEditingWorkspaceProps> = ({
     setOverlayText(plan.text_overlay?.text ?? '');
   };
 
-  // Generate Edit (Gemini Plan -> Automatic Execution)
+  // Generate Edit
   const handleGenerateEdit = async () => {
     if (!selectedAssetId) {
       setProcessError('Please select a photo from your Media Library first.');
@@ -212,7 +213,7 @@ export const PhotoEditingWorkspace: React.FC<PhotoEditingWorkspaceProps> = ({
     setImportSuccess(false);
 
     try {
-      setProcessingStage('Analyzing photo & detecting subjects with OpenCV...');
+      setProcessingStage('Analyzing photo & detecting subjects...');
       const planRes = await apiClient.generatePhotoPlan(projectId, {
         assetId: selectedAssetId,
         userPrompt: prompt,
@@ -247,7 +248,7 @@ export const PhotoEditingWorkspace: React.FC<PhotoEditingWorkspaceProps> = ({
     }
   };
 
-  // Apply Quick Adjustments (Direct re-execution without calling Gemini)
+  // Apply Quick Adjustments (Direct re-execution without calling planner)
   const handleApplyAdjustments = async () => {
     if (!selectedAssetId) return;
 
@@ -602,20 +603,6 @@ export const PhotoEditingWorkspace: React.FC<PhotoEditingWorkspaceProps> = ({
           <h2 className="text-sm font-semibold uppercase tracking-wider text-white">
             Describe Your Edit (or Pick an Example)
           </h2>
-        </div>
-
-        {/* Example Prompt Chips */}
-        <div className="flex flex-wrap gap-2">
-          {EXAMPLE_PROMPTS.map((ex) => (
-            <button
-              key={ex}
-              type="button"
-              onClick={() => setPrompt(ex)}
-              className="text-xs px-3 py-1 rounded-full bg-studio-card hover:bg-violet-950/40 border border-studio-border hover:border-violet-500/50 text-zinc-300 hover:text-white transition-colors"
-            >
-              ✦ {ex}
-            </button>
-          ))}
         </div>
 
         <div className="relative">

@@ -1,5 +1,5 @@
 """
-NovaCut Photo Background Removal Engine
+Photo Background Removal Engine
 Supports:
 1. Native `rembg` if available.
 2. Direct ONNX Runtime CPU inference (`u2net.onnx` / `u2netp.onnx`) if rembg is not installed.
@@ -39,7 +39,7 @@ def ensure_model(model_name: str = "u2netp.onnx") -> str:
 
     for attempt in range(1, 4):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "NovaCut/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "Studio/1.0"})
             with urllib.request.urlopen(req, timeout=60) as resp, open(model_path, "wb") as f:
                 total_size = int(resp.headers.get("content-length", 0))
                 downloaded = 0

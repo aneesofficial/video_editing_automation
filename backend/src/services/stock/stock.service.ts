@@ -113,7 +113,7 @@ export class StockService {
       const res = await fetch('https://api.pexels.com/v1/curated?per_page=1', {
         headers: {
           Authorization: trimmed,
-          'User-Agent': 'NovaCut-Studio/1.0',
+          'User-Agent': 'Studio/1.0',
         },
         signal: controller.signal,
       });
@@ -406,7 +406,7 @@ export class StockService {
     const response = await this.fetchWithRetry(url.toString(), {
       headers: {
         Authorization: opts.apiKey,
-        'User-Agent': 'NovaCut-Studio/1.0',
+        'User-Agent': 'Studio/1.0',
       },
     });
 

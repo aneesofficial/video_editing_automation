@@ -42,13 +42,19 @@ export const StockImportSchema = z.object({
 
 export class StockController {
   /**
-   * Returns current stock key configuration status (masked values only).
+   * Returns current stock key configuration status (simple true/false states, no masked keys).
    */
   public async getStatus(_request: FastifyRequest, reply: FastifyReply) {
     const status = stockService.getStatus();
     return reply.send({
       success: true,
-      data: status,
+      data: {
+        connected: Boolean(status.pexels.hasKey || status.pixabay.hasKey),
+        configured: Boolean(status.pexels.configured || status.pixabay.configured),
+        hasKey: Boolean(status.pexels.hasKey || status.pixabay.hasKey),
+        pexels: { hasKey: status.pexels.hasKey, configured: status.pexels.configured },
+        pixabay: { hasKey: status.pixabay.hasKey, configured: status.pixabay.configured },
+      },
     });
   }
 

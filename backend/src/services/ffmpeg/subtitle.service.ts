@@ -141,7 +141,7 @@ export class SubtitleService {
     // Headers & Styles
     const lines: string[] = [
       '[Script Info]',
-      'Title: Novacut Automated Subtitles',
+      'Title: Subtitles',
       'ScriptType: v4.00+',
       'WrapStyle: 0',
       'ScaledBorderAndShadow: yes',

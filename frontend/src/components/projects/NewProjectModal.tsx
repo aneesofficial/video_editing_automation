@@ -5,8 +5,6 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useWorkspace } from '../../store/WorkspaceContext';
 import { useProjects } from '../../store/ProjectContext';
-import { AspectRatio, VideoResolution } from '../../types/video';
-import { ASPECT_RATIOS } from '../../utils/constants';
 
 interface NewProjectModalProps {
   isOpen: boolean;
@@ -15,13 +13,11 @@ interface NewProjectModalProps {
 
 export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { resetWorkspace, setProjectTitle, setAspectRatio, setResolution, setCurrentProjectId } = useWorkspace();
+  const { resetWorkspace, setProjectTitle, setCurrentProjectId } = useWorkspace();
   const { saveProject, clients } = useProjects();
 
   const [title, setTitle] = useState('');
   const [clientName, setClientName] = useState('');
-  const [selectedAspect, setSelectedAspect] = useState<AspectRatio>('16:9');
-  const [selectedRes, setSelectedRes] = useState<VideoResolution>('1080p');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -30,13 +26,11 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
 
     try {
       setIsSubmitting(true);
-      const finalTitle = title.trim() || 'Untitled Video Cut';
+      const finalTitle = title.trim() || 'Untitled Project';
       const finalClient = clientName.trim() || 'General';
 
       resetWorkspace();
       setProjectTitle(finalTitle);
-      setAspectRatio(selectedAspect);
-      setResolution(selectedRes);
 
       const saved = await saveProject({
         title: finalTitle,
@@ -44,10 +38,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
         description: `Project for ${finalClient}`,
         status: 'draft',
         rawPrompt: '',
-        tags: ['Cut all awkward silences > 0.4s'],
         preferences: {
-          aspectRatio: selectedAspect,
-          resolution: selectedRes,
+          aspectRatio: '16:9',
+          resolution: '1080p',
           frameRate: '30fps',
           style: 'viral-fast',
           pacingDensity: 4,
@@ -61,7 +54,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
 
       setCurrentProjectId(saved.id);
       onClose();
-      navigate(`/workspace/${saved.id}`);
+      navigate(`/editor/${saved.id}`);
     } catch (err) {
       console.error('Error creating project:', err);
     } finally {
@@ -73,94 +66,45 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Create New Video Project"
-      description="Initialize a clean editing timeline and configure target compositions."
-      maxWidth="md"
+      title="New Project"
+      maxWidth="sm"
       footer={
         <>
           <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button variant="primary" size="sm" onClick={handleCreate} isLoading={isSubmitting}>
-            Create Project
+            Create
           </Button>
         </>
       }
     >
-      <form onSubmit={handleCreate} className="space-y-4">
+      <form onSubmit={handleCreate} className="space-y-3">
         <Input
-          label="Project Title"
+          label="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Q4 Executive Keynote Cut"
+          placeholder="Project title"
           autoFocus
         />
 
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-studio-muted">
-            Client Name
+          <label className="block text-xs font-medium text-[#8B909A]">
+            Client name
           </label>
           <input
-            list="client-options"
+            list="client-suggestions"
             type="text"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
-            placeholder="Select existing client or type new name (e.g. Acme Corp)"
-            className="w-full bg-studio-surface border border-studio-border focus:border-violet-500 rounded-lg px-3 py-2 text-sm text-white placeholder-studio-subtle focus:outline-none transition-colors"
+            placeholder="Select or enter client name"
+            className="w-full bg-[#121317] border border-[#23262D] focus:border-[#C8A96A] rounded px-3 py-2 text-sm text-[#ECEDEF] placeholder-[#5a5f6b] focus:outline-none transition-colors"
           />
-          <datalist id="client-options">
+          <datalist id="client-suggestions">
             {clients.map((c) => (
               <option key={c.id} value={c.name} />
             ))}
           </datalist>
-          <p className="text-[11px] text-studio-subtle">
-            Folders on disk will be automatically created under backend/storage/clients/{clientName.trim() || 'General'}/
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-studio-muted">
-            Target Composition
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {ASPECT_RATIOS.slice(0, 3).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedAspect(item.id)}
-                className={`py-2 px-3 rounded-lg border text-center transition-all ${
-                  selectedAspect === item.id
-                    ? 'bg-violet-600/15 border-violet-500 text-white'
-                    : 'bg-studio-surface border-studio-border text-studio-muted hover:text-studio-text'
-                }`}
-              >
-                <div className="text-xs font-semibold">{item.label}</div>
-                <div className="text-[10px] text-studio-subtle">{item.sublabel.split(' ')[0]}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-studio-muted">
-            Master Resolution
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {(['1080p', '4K'] as const).map((res) => (
-              <button
-                key={res}
-                type="button"
-                onClick={() => setSelectedRes(res)}
-                className={`py-2 px-3 rounded-lg border text-center text-xs font-medium transition-all ${
-                  selectedRes === res
-                    ? 'bg-violet-600/15 border-violet-500 text-violet-300'
-                    : 'bg-studio-surface border-studio-border text-studio-muted hover:text-studio-text'
-                }`}
-              >
-                {res === '1080p' ? '1080p Full HD' : '4K Ultra HD'}
-              </button>
-            ))}
-          </div>
         </div>
       </form>
     </Modal>
