@@ -490,7 +490,7 @@ class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-      const response = await fetch(`${this.baseUrl}/health`, {
+      const response = await fetch(`${this.baseUrl}/api/health`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         signal: controller.signal,
@@ -500,37 +500,25 @@ class ApiClient {
       const latencyMs = Math.round(performance.now() - startTime);
 
       if (response.ok) {
-        const data = await response.json();
-        let rawReport = null;
-        try {
-          const sysRes = await fetch(`${this.baseUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
-          if (sysRes.ok) rawReport = await sysRes.json();
-        } catch {}
-
         return {
           connected: true,
           status: 'healthy',
-          message: data.service || 'Studio Engine Online',
+          message: 'Operational',
           latencyMs,
-          engineVersion: data.version || 'v1.0.0',
-          rawReport,
         };
       }
 
       return {
         connected: false,
         status: 'unreachable',
-        message: `Backend returned status ${response.status}`,
-        error: `Backend returned status ${response.status}`,
+        message: 'Offline',
         latencyMs,
       };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown connection error';
+    } catch {
       return {
         connected: false,
-        status: 'offline',
-        message: `Backend offline (${this.baseUrl}): ${message}. Ensure backend is running.`,
-        error: message,
+        status: 'unreachable',
+        message: 'Cannot reach server',
       };
     }
   }
@@ -1148,9 +1136,16 @@ class ApiClient {
     return json.data || null;
   }
 
-  // --- Step 9 System Health & Storage Management Methods ---
+  // --- System Health & Checks ---
 
-  async getSystemHealth(): Promise<SystemHealthReport> {
+  async getSystemCheck(): Promise<Record<string, 'ok' | 'fail'>> {
+    const res = await fetch(`${this.baseUrl}/api/v1/system/check`);
+    if (!res.ok) throw new Error('Failed to retrieve system check');
+    const json = await res.json();
+    return json.data || json;
+  }
+
+  async getSystemHealth(): Promise<{ status: string }> {
     const res = await fetch(`${this.baseUrl}/api/health`);
     if (!res.ok) throw new Error('Failed to retrieve system health');
     return res.json();

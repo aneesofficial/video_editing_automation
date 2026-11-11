@@ -37,3 +37,4 @@ export interface EditJobStatus {
 }
 
 export type AIJobStatus = EditJobStatus;
+

@@ -274,14 +274,13 @@ Return ONLY valid JSON.`;
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+        throw new Error('Photo planning service error');
       }
 
       const json = (await response.json()) as any;
       const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawText) {
-        throw new Error('Gemini API returned an empty response');
+        throw new Error('Photo planning service returned an empty response');
       }
 
       const cleaned = rawText

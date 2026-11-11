@@ -2,16 +2,20 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { systemService } from '../../services/system/system.service.js';
 
 export class SystemController {
-  public async getHealth(_request: FastifyRequest, reply: FastifyReply) {
+  public async getSystemCheck(_request: FastifyRequest, reply: FastifyReply) {
     try {
-      const health = await systemService.getHealth();
-      return reply.send(health);
-    } catch (err: any) {
+      const check = await systemService.getSystemCheck();
+      return reply.send({ success: true, data: check });
+    } catch {
       return reply.status(500).send({
-        status: 'error',
-        message: err.message || 'Failed to perform health check',
+        success: false,
+        error: 'System check failed',
       });
     }
+  }
+
+  public async getHealth(_request: FastifyRequest, reply: FastifyReply) {
+    return reply.send({ status: 'ok' });
   }
 
   public async getStorage(_request: FastifyRequest, reply: FastifyReply) {

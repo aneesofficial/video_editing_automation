@@ -319,7 +319,7 @@ export class FFmpegService {
               } else {
                 reject(
                   new Error(
-                    `FFmpeg preview generation fallback failed (code ${fbCode}): ${fallbackStderr.slice(-400)}`
+                    `Preview generation fallback failed (code ${fbCode})`
                   )
                 );
               }
@@ -327,7 +327,7 @@ export class FFmpegService {
             return;
           }
 
-          reject(new Error(`FFmpeg preview generation failed (code ${code}): ${stderr.slice(-400)}`));
+          reject(new Error(`Preview generation failed (code ${code})`));
         }
       });
 
@@ -353,7 +353,7 @@ export class FFmpegService {
         if (code === 0) {
           resolve(outputPath);
         } else {
-          reject(new Error(`FFmpeg audio extraction failed (code ${code}): ${stderr}`));
+          reject(new Error(`Audio extraction failed (code ${code})`));
         }
       });
     });
@@ -392,7 +392,7 @@ export class FFmpegService {
         if (code === 0) {
           resolve(outputPath);
         } else {
-          reject(new Error(`FFmpeg thumbnail generation failed (code ${code}): ${stderr}`));
+          reject(new Error(`Thumbnail generation failed (code ${code})`));
         }
       });
     });
@@ -1191,8 +1191,8 @@ export class FFmpegService {
           onProgress?.(100, 'Rendering completed successfully');
           resolve(outputPath);
         } else {
-          console.error('[FFmpeg Error]', stderrBuf);
-          reject(new Error(`FFmpeg rendering failed (code ${code}): ${stderrBuf.slice(-500)}`));
+          console.error('[Engine Error]', stderrBuf);
+          reject(new Error(`Video rendering failed (code ${code})`));
         }
       });
 

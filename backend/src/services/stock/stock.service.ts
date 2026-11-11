@@ -103,7 +103,7 @@ export class StockService {
   public async testPexelsKey(key: string): Promise<{ valid: boolean; error?: string }> {
     const trimmed = key.trim();
     if (!trimmed) {
-      return { valid: false, error: 'Pexels API key is empty.' };
+      return { valid: false, error: 'Footage key is empty.' };
     }
 
     try {
@@ -124,15 +124,15 @@ export class StockService {
         return { valid: true };
       }
       if (res.status === 401 || res.status === 403) {
-        return { valid: false, error: 'Invalid Pexels API key (401 Unauthorized).' };
+        return { valid: false, error: 'Invalid footage key.' };
       }
       if (res.status === 429) {
-        return { valid: true, error: 'Key is valid but Pexels rate limit reached (429).' };
+        return { valid: true, error: 'Key is valid but rate limit reached.' };
       }
-      return { valid: false, error: `Pexels API responded with status ${res.status}.` };
+      return { valid: false, error: `Footage service responded with status ${res.status}.` };
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        return { valid: false, error: 'Pexels verification timed out after 60 seconds.' };
+        return { valid: false, error: 'Footage verification timed out after 60 seconds.' };
       }
       return { valid: false, error: err?.message || 'Network connection failed.' };
     }
@@ -144,7 +144,7 @@ export class StockService {
   public async testPixabayKey(key: string): Promise<{ valid: boolean; error?: string }> {
     const trimmed = key.trim();
     if (!trimmed) {
-      return { valid: false, error: 'Pixabay API key is empty.' };
+      return { valid: false, error: 'Footage key is empty.' };
     }
 
     try {
@@ -165,15 +165,15 @@ export class StockService {
         }
       }
       if (res.status === 400 || res.status === 401) {
-        return { valid: false, error: 'Invalid Pixabay API key (Unauthorized / Bad Request).' };
+        return { valid: false, error: 'Invalid footage key.' };
       }
       if (res.status === 429) {
-        return { valid: true, error: 'Key is valid but Pixabay rate limit reached (429).' };
+        return { valid: true, error: 'Key is valid but rate limit reached.' };
       }
-      return { valid: false, error: `Pixabay API responded with status ${res.status}.` };
+      return { valid: false, error: `Footage service responded with status ${res.status}.` };
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        return { valid: false, error: 'Pixabay verification timed out after 60 seconds.' };
+        return { valid: false, error: 'Footage verification timed out after 60 seconds.' };
       }
       return { valid: false, error: err?.message || 'Network connection failed.' };
     }
@@ -414,16 +414,15 @@ export class StockService {
       return {
         items: [],
         totalHits: 0,
-        error: 'Pexels API rate limit reached (200 requests/hour limit). Please wait a few moments.',
+        error: 'Footage service rate limit reached. Please wait a moment.',
       };
     }
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => '');
       return {
         items: [],
         totalHits: 0,
-        error: `Pexels API error (${response.status}): ${errText.slice(0, 100)}`,
+        error: `Footage service responded with status ${response.status}`,
       };
     }
 
@@ -529,16 +528,15 @@ export class StockService {
       return {
         items: [],
         totalHits: 0,
-        error: 'Pixabay API rate limit reached (100 requests/minute limit). Please wait a moment.',
+        error: 'Footage service rate limit reached. Please wait a moment.',
       };
     }
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => '');
       return {
         items: [],
         totalHits: 0,
-        error: `Pixabay API error (${response.status}): ${errText.slice(0, 100)}`,
+        error: `Footage service responded with status ${response.status}`,
       };
     }
 

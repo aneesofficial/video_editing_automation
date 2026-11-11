@@ -37,6 +37,14 @@ export const UpdateProjectSchema = z.object({
   durationSeconds: z.number().optional(),
 });
 
+function sanitizeNotes(notes: string | null | undefined): string | null {
+  if (!notes) return notes || null;
+  return notes
+    .replace(/\s*•\s*libx264\b/gi, '')
+    .replace(/\b(gemini|google|ollama|whisper|ffmpeg|ffprobe|libx264|onnx|u2net)\b/gi, 'service')
+    .trim();
+}
+
 export class ProjectsController {
   public async listProjects(
     req: FastifyRequest<{ Querystring: { clientId?: string; search?: string } }>,
@@ -83,6 +91,14 @@ export class ProjectsController {
       ...p,
       tags: p.tagsJson ? JSON.parse(p.tagsJson) : [],
       preferences: p.preferencesJson ? JSON.parse(p.preferencesJson) : null,
+      versions: (p.versions || []).map((v: any) => ({
+        ...v,
+        notes: sanitizeNotes(v.notes),
+      })),
+      exportedFiles: (p.exportedFiles || []).map((e: any) => ({
+        ...e,
+        notes: sanitizeNotes(e.notes),
+      })),
     }));
 
     return reply.send({ success: true, data: formatted });
@@ -212,6 +228,14 @@ export class ProjectsController {
       mediaAssets: mediaAssetsWithUrls,
       tags: project.tagsJson ? JSON.parse(project.tagsJson) : [],
       preferences,
+      versions: (project.versions || []).map((v: any) => ({
+        ...v,
+        notes: sanitizeNotes(v.notes),
+      })),
+      exportedFiles: (project.exportedFiles || []).map((e: any) => ({
+        ...e,
+        notes: sanitizeNotes(e.notes),
+      })),
     };
 
     return reply.send({ success: true, data: formatted });
@@ -541,9 +565,14 @@ export class ProjectsController {
       return reply.status(404).send({ success: false, error: 'Project not found' });
     }
 
+    const versions = (project.versions || []).map((v: any) => ({
+      ...v,
+      notes: sanitizeNotes(v.notes),
+    }));
+
     return reply.send({
       success: true,
-      data: project.versions,
+      data: versions,
     });
   }
 
@@ -934,14 +963,14 @@ export class ProjectsController {
           plan,
           planId: editingPlan.id,
           version: versionTag,
-          filePath,
+          filePath: `plans/plan_${versionTag}.json`,
         },
       });
     } catch (planErr: any) {
-      console.error('[AI Planner] Plan generation failed:', planErr);
+      console.error('[Planner] Plan generation failed:', planErr);
       return reply.status(500).send({
         success: false,
-        error: planErr?.message || 'Failed to generate AI editing plan. Please check your Gemini API key in Settings.',
+        error: 'Failed to generate edit plan. Please check your service key in Settings.',
       });
     }
   }

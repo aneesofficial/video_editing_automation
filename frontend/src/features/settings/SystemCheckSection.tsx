@@ -18,80 +18,49 @@ export const SystemCheckSection: React.FC = () => {
   const runCheck = async () => {
     setIsLoading(true);
     try {
-      const health = await apiClient.checkHealth();
-      const raw = health.rawReport || {};
-
-      const videoEngineOk = Boolean(
-        raw.videoEngine?.connected ?? health.connected
-      );
-
-      const speechOk = Boolean(
-        raw.speech?.connected ?? (raw.python?.status === 'ok')
-      );
-
-      const photoCutoutOk = Boolean(
-        raw.photoCutout?.connected
-      );
-
-      const editServiceOk = Boolean(
-        raw.editService?.connected
-      );
-
-      const footageServiceOk = Boolean(
-        raw.footageService?.connected
-      );
-
-      const storageOk = Boolean(
-        raw.storage?.connected !== false &&
-        (raw.disk ? raw.disk.freeGb > 5 : true)
-      );
-
-      const musicCount = raw.music?.trackCount ?? raw.musicLibrary?.trackCount ?? 0;
-      const musicOk = musicCount > 0;
+      const check = await apiClient.getSystemCheck();
 
       const checkedItems: SystemItem[] = [
         {
           name: 'Video engine',
-          ok: videoEngineOk,
-          statusText: videoEngineOk ? 'Operational' : 'Unavailable',
+          ok: check['Video engine'] === 'ok',
+          statusText: check['Video engine'] === 'ok' ? 'Operational' : 'Unavailable',
           fixTip: 'Verify video processing binary is accessible in environment path.',
         },
         {
           name: 'Speech',
-          ok: speechOk,
-          statusText: speechOk ? 'Operational' : 'Unavailable',
+          ok: check['Speech'] === 'ok',
+          statusText: check['Speech'] === 'ok' ? 'Operational' : 'Unavailable',
           fixTip: 'Verify speech processing module is active in worker environment.',
         },
         {
           name: 'Photo cut-out',
-          ok: photoCutoutOk,
-          statusText: photoCutoutOk ? 'Ready' : 'Model missing',
-          fixTip: 'Place cut-out weights file into backend/storage/models directory.',
+          ok: check['Photo cut-out'] === 'ok',
+          statusText: check['Photo cut-out'] === 'ok' ? 'Ready' : 'Model missing',
+          fixTip: 'Place cut-out weights file into models directory.',
         },
         {
           name: 'Edit service',
-          ok: editServiceOk,
-          statusText: editServiceOk ? 'Connected' : 'Not configured',
+          ok: check['Edit service'] === 'ok',
+          statusText: check['Edit service'] === 'ok' ? 'Connected' : 'Not configured',
           fixTip: 'Paste and save Edit service key in the Services tab.',
         },
         {
           name: 'Footage service',
-          ok: footageServiceOk,
-          statusText: footageServiceOk ? 'Connected' : 'Not configured',
+          ok: check['Footage service'] === 'ok',
+          statusText: check['Footage service'] === 'ok' ? 'Connected' : 'Not configured',
           fixTip: 'Paste and save Footage service key in the Services tab.',
         },
         {
           name: 'Storage',
-          ok: storageOk,
-          statusText: storageOk
-            ? `${raw.disk?.freeGb ?? 0} GB free`
-            : 'Low disk space',
+          ok: check['Storage'] === 'ok',
+          statusText: check['Storage'] === 'ok' ? 'Ready' : 'Low space',
           fixTip: 'Clear temporary files in Storage and Backup tab.',
         },
         {
           name: 'Music',
-          ok: musicOk,
-          statusText: musicOk ? `${musicCount} tracks` : 'No tracks',
+          ok: check['Music'] === 'ok',
+          statusText: check['Music'] === 'ok' ? 'Ready' : 'No tracks',
           fixTip: 'Upload audio files in the Music tab.',
         },
       ];

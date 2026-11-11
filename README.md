@@ -10,6 +10,8 @@ Autonomous Video and Photo Editing Workstation. Turn raw footage, photos, and pr
 Run `start.bat` in the project root:
 - Backend Server: http://localhost:3001
 - Frontend Web App: http://localhost:5173
+- Public Health Check: http://localhost:3001/api/health (returns `{"status":"ok"}`)
+- Neutral Diagnostics: http://localhost:3001/api/v1/system/check
 
 ### Stopping the Application
 Run `stop.bat` to terminate all background servers.
@@ -52,7 +54,7 @@ To run the automated smoke test:
 npm run smoke
 ```
 This tests:
-1. System diagnostics and operational status
+1. System diagnostics and operational status (via neutral system check)
 2. Photo editing processing
 3. Video render execution and stream integrity
 

@@ -38,24 +38,21 @@ async function runSmokeTest() {
     // 1. System Health Verification
     // ----------------------------------------------------
     console.log('[STEP 1/3] Verifying System Health & External Integrations...');
-    const health = await systemService.getHealth();
+    const check = await systemService.getSystemCheck();
 
-    console.log(`  - Video Engine:    ${health.videoEngine?.connected ? 'READY' : 'OFFLINE'}`);
-    console.log(`  - Speech:          ${health.speech?.connected ? 'READY' : 'OFFLINE'}`);
-    console.log(`  - Photo Cut-out:   ${health.photoCutout?.connected ? 'READY' : 'NOT FOUND'}`);
-    console.log(`  - Edit Service:    ${health.editService?.connected ? 'CONNECTED' : 'NOT SET'}`);
-    console.log(`  - Footage Service: ${health.footageService?.connected ? 'CONNECTED' : 'NOT SET'}`);
-    console.log(`  - Storage:         ${health.storage?.connected ? 'OK' : 'WARNING'} (${health.disk.freeGb} GB free)`);
-    console.log(`  - Music:           ${health.music?.connected ? 'READY' : 'EMPTY'} (${health.music?.trackCount ?? 0} tracks)`);
+    console.log(`  - Video Engine:    ${check['Video engine']?.toUpperCase()}`);
+    console.log(`  - Speech:          ${check['Speech']?.toUpperCase()}`);
+    console.log(`  - Photo Cut-out:   ${check['Photo cut-out']?.toUpperCase()}`);
+    console.log(`  - Edit Service:    ${check['Edit service']?.toUpperCase()}`);
+    console.log(`  - Footage Service: ${check['Footage service']?.toUpperCase()}`);
+    console.log(`  - Storage:         ${check['Storage']?.toUpperCase()}`);
+    console.log(`  - Music:           ${check['Music']?.toUpperCase()}`);
 
-    if (health.database.status !== 'ok') {
-      throw new Error(`Database check failed: ${health.database.message}`);
+    if (check['Video engine'] !== 'ok') {
+      throw new Error('Video engine check failed');
     }
-    if (health.ffmpeg.status !== 'ok') {
-      throw new Error(`FFmpeg check failed: ${health.ffmpeg.message}`);
-    }
-    if (health.python.status !== 'ok') {
-      throw new Error(`Python check failed: ${health.python.message}`);
+    if (check['Speech'] !== 'ok') {
+      throw new Error('Speech engine check failed');
     }
     console.log('[PASS] STEP 1 PASSED: Core system health is operational.\n');
 

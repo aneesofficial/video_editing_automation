@@ -239,6 +239,22 @@ export class SystemService {
   }
 
   /**
+   * Neutral system check returning strictly neutral labels and 'ok' | 'fail'
+   */
+  public async getSystemCheck(): Promise<Record<string, 'ok' | 'fail'>> {
+    const health = await this.getHealth();
+    return {
+      'Video engine': health.videoEngine?.connected ? 'ok' : 'fail',
+      'Speech': health.speech?.connected ? 'ok' : 'fail',
+      'Photo cut-out': health.photoCutout?.connected ? 'ok' : 'fail',
+      'Edit service': health.editService?.connected ? 'ok' : 'fail',
+      'Footage service': health.footageService?.connected ? 'ok' : 'fail',
+      'Storage': health.storage?.connected ? 'ok' : 'fail',
+      'Music': health.music?.connected ? 'ok' : 'fail',
+    };
+  }
+
+  /**
    * Calculates storage usage per client, cache size, and free disk space.
    */
   public async getStorageOverview(): Promise<StorageOverviewReport> {
@@ -444,7 +460,7 @@ print("OK")
 
     return {
       fileName: zipName,
-      filePath: zipPath,
+      filePath: `/backups/${zipName}`,
       sizeBytes: zipStat.size,
       fileCount: filesToBackup.length,
       createdAt: now.toISOString(),
@@ -463,7 +479,7 @@ print("OK")
           const stat = fs.statSync(filePath);
           return {
             fileName,
-            filePath,
+            filePath: `/backups/${fileName}`,
             sizeBytes: stat.size,
             fileCount: 0,
             createdAt: stat.mtime.toISOString(),

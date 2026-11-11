@@ -150,7 +150,7 @@ export class GeminiPlannerService {
         maskedKey: null,
         visionEnabled: env.GEMINI_VISION_ENABLED,
         ...whisperInfo,
-        reason: 'Gemini API key is not configured. Please paste your key in Settings.',
+        reason: 'Edit service key is not configured. Please paste your key in Settings.',
       };
     }
 
@@ -163,10 +163,10 @@ export class GeminiPlannerService {
             online: false,
             model: this.primaryModel,
             hasKey: true,
-            maskedKey: getMaskedApiKey(key),
+            maskedKey: null,
             visionEnabled: env.GEMINI_VISION_ENABLED,
             ...whisperInfo,
-            reason: 'Invalid API key: Google rejected the key. Please verify your Gemini API key in Settings.',
+            reason: 'Invalid key. Please verify your edit service key in Settings.',
           };
         }
         if (res.status === 429) {
@@ -174,20 +174,20 @@ export class GeminiPlannerService {
             online: true,
             model: this.primaryModel,
             hasKey: true,
-            maskedKey: getMaskedApiKey(key),
+            maskedKey: null,
             visionEnabled: env.GEMINI_VISION_ENABLED,
             ...whisperInfo,
-            reason: 'Google Gemini free-tier rate limit reached. Please wait 1-2 minutes.',
+            reason: 'Service rate limit reached. Please wait 1-2 minutes.',
           };
         }
         return {
           online: false,
           model: this.primaryModel,
           hasKey: true,
-          maskedKey: getMaskedApiKey(key),
+          maskedKey: null,
           visionEnabled: env.GEMINI_VISION_ENABLED,
           ...whisperInfo,
-          reason: `Google Gemini responded with HTTP status ${res.status}.`,
+          reason: `Service responded with HTTP status ${res.status}.`,
         };
       }
 
@@ -195,7 +195,7 @@ export class GeminiPlannerService {
         online: true,
         model: this.primaryModel,
         hasKey: true,
-        maskedKey: getMaskedApiKey(key),
+        maskedKey: null,
         visionEnabled: env.GEMINI_VISION_ENABLED,
         ...whisperInfo,
         reason: null,
@@ -221,7 +221,7 @@ export class GeminiPlannerService {
   public async testAndSaveKey(apiKey: string): Promise<{ success: boolean; maskedKey?: string; error?: string }> {
     const trimmed = (apiKey || '').trim();
     if (!trimmed) {
-      return { success: false, error: 'Please provide a valid non-empty Gemini API key.' };
+      return { success: false, error: 'Please provide a valid key.' };
     }
 
     try {
@@ -230,8 +230,7 @@ export class GeminiPlannerService {
       const data = (await res.json()) as any;
 
       if (!res.ok) {
-        const msg = data?.error?.message || `Google API rejected the key with status ${res.status}`;
-        return { success: false, error: `Invalid API key: ${msg}` };
+        return { success: false, error: 'Invalid key.' };
       }
 
       // Key is valid - save to backend/.env and update runtime env
@@ -239,12 +238,11 @@ export class GeminiPlannerService {
 
       return {
         success: true,
-        maskedKey: getMaskedApiKey(trimmed) || undefined,
       };
     } catch (err: any) {
       return {
         success: false,
-        error: `Could not verify key with Google Gemini: ${err?.message || 'Network error'}`,
+        error: 'Could not verify service key.',
       };
     }
   }
@@ -286,7 +284,7 @@ export class GeminiPlannerService {
 
     const key = env.GEMINI_API_KEY?.trim();
     if (!key) {
-      throw new Error('Gemini API key is not configured. Please paste your key in Settings.');
+      throw new Error('Edit service key is not configured. Please paste your key in Settings.');
     }
 
     // 1. Build prompt for Gemini
@@ -352,27 +350,27 @@ STRICT RULES:
             const errData = (await res.json().catch(() => ({}))) as any;
             const errMsg = errData?.error?.message || `HTTP ${res.status}`;
             if (res.status === 429) {
-              throw new Error('Google Gemini free-tier rate limit reached. Please wait 1-2 minutes and try again.');
+              throw new Error('Service rate limit reached. Please wait 1-2 minutes and try again.');
             }
             if (res.status === 400 || res.status === 403) {
-              throw new Error(`Invalid API key: Google rejected the key (${errMsg}).`);
+              throw new Error('Invalid key. Please verify your edit service key in Settings.');
             }
             if (res.status === 503 || res.status === 404) {
-              console.warn(`[GeminiPlanner] Model ${model} returned ${res.status}: ${errMsg}. Retrying or falling back...`);
+              console.warn(`[Planner] Service returned ${res.status}. Retrying or falling back...`);
               if (attempt < maxRetries) {
                 await new Promise((r) => setTimeout(r, 2000 * attempt));
                 continue;
               }
               break;
             }
-            throw new Error(`Gemini API error: ${errMsg}`);
+            throw new Error('Service error occurred while generating edit plan.');
           }
 
           const data = (await res.json()) as any;
           const candidate = data.candidates?.[0];
           const text = candidate?.content?.parts?.[0]?.text;
           if (!text) {
-            throw new Error('Gemini returned an empty response.');
+            throw new Error('Planner service returned an empty response.');
           }
 
           rawJsonResponse = JSON.parse(text);

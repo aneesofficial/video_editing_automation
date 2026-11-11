@@ -27,8 +27,8 @@ ping -n 5 127.0.0.1 >nul
 echo.
 echo ===================================================
 echo  Studio is running!
-echo  Backend:   http://localhost:3001
-echo  Frontend:  http://localhost:5173
+echo  Frontend:      http://localhost:5173
+echo  Health check:  http://localhost:3001/api/health
 echo ===================================================
 echo.
 echo Opening browser at http://localhost:5173 ...

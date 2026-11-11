@@ -20,6 +20,7 @@ import { stockRoutes } from './modules/stock/stock.routes.js';
 import { systemRoutes } from './modules/system/system.routes.js';
 import { systemService } from './services/system/system.service.js';
 import { storageService } from './services/storage/storage.service.js';
+import { prisma } from './config/database.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = fastify({
@@ -58,19 +59,71 @@ export async function buildApp(): Promise<FastifyInstance> {
     decorateReply: false,
   });
 
-  // Basic Health check
-  app.get('/health', async () => {
-    return {
-      status: 'ok',
-      service: 'Studio Backend',
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-    };
+  // Strip X-Powered-By and Server headers from all responses
+  app.addHook('onSend', async (_request, reply) => {
+    reply.removeHeader('X-Powered-By');
+    reply.removeHeader('x-powered-by');
+    reply.removeHeader('Server');
+    reply.removeHeader('server');
   });
 
-  // Comprehensive System Health check: checks Database, FFmpeg, Python, Models, Keys, and Disk
-  app.get('/api/health', async () => {
-    return systemService.getHealth();
+  // Centralized Sanitized Error Handler (no stack traces or file paths to client)
+  app.setErrorHandler((error: any, request, reply) => {
+    // Keep detailed errors in backend console / log only
+    console.error(`[Backend Error] ${request.method} ${request.url}:`, error.message, error.stack);
+
+    const statusCode =
+      typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 600
+        ? error.statusCode
+        : 500;
+
+    if (statusCode >= 500) {
+      return reply.status(statusCode).send({
+        success: false,
+        error: 'An internal error occurred. Please try again.',
+      });
+    }
+
+    // Sanitize any 4xx error message
+    let safeMessage = error.message || 'Request failed';
+    safeMessage = safeMessage.replace(/[a-zA-Z]:\\[^\s"']+/g, '[path]');
+    safeMessage = safeMessage.replace(/\/(Users|home|var|usr|etc)\/[^\s"']+/g, '[path]');
+    safeMessage = safeMessage.replace(
+      /\b(gemini|google|ollama|whisper|ffmpeg|ffprobe|libx264|onnx|u2net|pexels|pixabay|prisma|sqlite|fastify|node)\b/gi,
+      'service'
+    );
+
+    return reply.status(statusCode).send({
+      success: false,
+      error: safeMessage,
+    });
+  });
+
+  // Neutral 404 Handler
+  app.setNotFoundHandler((_request, reply) => {
+    return reply.status(404).send({
+      success: false,
+      error: 'Resource not found',
+    });
+  });
+
+  // Public health check: returns only {"status":"ok"} (or {"status":"error"}) and nothing else
+  app.get('/health', async (_req, reply) => {
+    try {
+      await prisma.$queryRawUnsafe('SELECT 1');
+      return reply.send({ status: 'ok' });
+    } catch {
+      return reply.status(500).send({ status: 'error' });
+    }
+  });
+
+  app.get('/api/health', async (_req, reply) => {
+    try {
+      await prisma.$queryRawUnsafe('SELECT 1');
+      return reply.send({ status: 'ok' });
+    } catch {
+      return reply.status(500).send({ status: 'error' });
+    }
   });
 
   // API v1 routes

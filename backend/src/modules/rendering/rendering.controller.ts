@@ -173,17 +173,15 @@ export class RenderingController {
 
   public async getHardwareEncoder(req: FastifyRequest, reply: FastifyReply) {
     const encoder = await ffmpegService.detectHardwareEncoder();
+    const isHardwareAccelerated = encoder === 'h264_nvenc' || encoder === 'h264_qsv';
     return reply.send({
       success: true,
       data: {
-        encoder,
-        isHardwareAccelerated: encoder === 'h264_nvenc' || encoder === 'h264_qsv',
-        description:
-          encoder === 'h264_nvenc'
-            ? 'NVIDIA NVENC (GPU Hardware Accelerated)'
-            : encoder === 'h264_qsv'
-            ? 'Intel QuickSync (GPU Hardware Accelerated)'
-            : 'libx264 (Multi-threaded CPU Software Encoder)',
+        encoder: isHardwareAccelerated ? 'hardware' : 'standard',
+        isHardwareAccelerated,
+        description: isHardwareAccelerated
+          ? 'Hardware Accelerated Encoder'
+          : 'Standard Software Encoder',
       },
     });
   }
