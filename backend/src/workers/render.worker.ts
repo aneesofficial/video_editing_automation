@@ -20,6 +20,8 @@ import { musicService } from '../services/music/music.service.js';
 import { pythonBridgeService } from '../services/python/python-bridge.service.js';
 import { ffprobeService } from '../services/ffmpeg/ffprobe.service.js';
 import { storageService, sanitizeWindowsName } from '../services/storage/storage.service.js';
+import { ruleEngineService } from '../services/rules/rule-engine.service.js';
+import { qualityCheckerService } from '../services/quality/quality-checker.service.js';
 
 export interface RenderJobData {
   renderingJobId: string;
@@ -147,6 +149,41 @@ export const renderWorker = new Worker<RenderJobData>(
         };
       }
 
+      // Safeguard: Ensure active plan strictly complies with Rule Engine standards
+      if (activePlanData && activePlanData.segments && activePlanData.segments.length > 0) {
+        try {
+          const assetContexts = project.mediaAssets.map((a: any) => {
+            let qualityAnalysis = undefined;
+            if (a.metadata?.rawMetadataJson) {
+              try {
+                qualityAnalysis = JSON.parse(a.metadata.rawMetadataJson).qualityAnalysis;
+              } catch {}
+            }
+            return {
+              id: a.id,
+              originalName: a.originalName || a.filename,
+              filename: a.filename,
+              storagePath: a.storagePath,
+              durationSeconds: a.durationSeconds || a.metadata?.duration || 10.0,
+              width: a.width || a.metadata?.width || 1920,
+              height: a.height || a.metadata?.height || 1080,
+              isPhoto: !a.hasAudio && !(a.scenes && a.scenes.length),
+              hasAudio: !!a.hasAudio,
+              qualityAnalysis,
+            };
+          });
+
+          activePlanData = await ruleEngineService.validateAndFixPlan({
+            plan: activePlanData,
+            assets: assetContexts,
+            targetPlatform: project.targetPlatform || 'YouTube 16:9',
+            targetDurationSeconds: activePlanData.targetDurationSeconds,
+          });
+        } catch (ruleErr) {
+          console.warn('[RenderWorker] RuleEngine non-fatal warning during render preparation:', ruleErr);
+        }
+      }
+
       // Feature settings & overrides from Result Screen
       const overrides = renderOptions || {};
       const captionsEnabled =
@@ -193,6 +230,13 @@ export const renderWorker = new Worker<RenderJobData>(
               }
             }
 
+            let qualityAnalysis = undefined;
+            if (asset.metadata?.rawMetadataJson) {
+              try {
+                qualityAnalysis = JSON.parse(asset.metadata.rawMetadataJson).qualityAnalysis;
+              } catch {}
+            }
+
             rawSegments.push({
               assetId: asset.id,
               filePath: asset.storagePath,
@@ -204,6 +248,10 @@ export const renderWorker = new Worker<RenderJobData>(
               motionEffect: seg.motionEffect || 'none',
               hasAudio,
               isHdr,
+              qualityAnalysis,
+              fps: asset.metadata?.frameRate || 30,
+              jCut: seg.jCut,
+              lCut: seg.lCut,
             });
           }
         }
@@ -435,34 +483,55 @@ export const renderWorker = new Worker<RenderJobData>(
       const assPath = path.join(versionDir, assFilename);
       let subtitleBurnOptions: SubtitleBurnOptions | undefined = undefined;
 
-      try {
-        subtitleService.generateAssFile({
-          outputPath: assPath,
-          targetWidth,
-          targetHeight,
-          aspectRatio: frameAspectRatio,
-          style: captionStyle,
-          highlightColorHex: brandPrimaryColor,
-          clipMappings,
-          transcriptsByAssetId,
-          textOverlays: activePlanData?.textOverlays || [],
-          fontsDir: storageService.getFontsDir(),
-        });
-
-        if (captionsEnabled && fs.existsSync(assPath)) {
-          subtitleBurnOptions = {
-            assPath,
-            fontsDir: storageService.getFontsDir(),
-          };
+      // Count total recognized speech words across all assets
+      let totalSpeechWords = 0;
+      for (const [_, trans] of transcriptsByAssetId) {
+        if (trans.segments && Array.isArray(trans.segments)) {
+          for (const s of trans.segments) {
+            if (s.words && Array.isArray(s.words) && s.words.length > 0) {
+              totalSpeechWords += s.words.length;
+            } else if (s.text && s.text.trim().length > 0) {
+              totalSpeechWords += s.text.trim().split(/\s+/).length;
+            }
+          }
         }
-      } catch (assErr) {
-        console.warn('[RenderWorker] Subtitle generation warning:', assErr);
+      }
+
+      const hasSpeech = totalSpeechWords > 0;
+
+      if (!hasSpeech) {
+        await logEvent('Captions', 10, 'No speech found, captions skipped.');
+        console.log('[RenderWorker] No speech found, captions skipped.');
+      } else if (captionsEnabled) {
+        try {
+          subtitleService.generateAssFile({
+            outputPath: assPath,
+            targetWidth,
+            targetHeight,
+            aspectRatio: frameAspectRatio,
+            style: captionStyle,
+            highlightColorHex: brandPrimaryColor,
+            clipMappings,
+            transcriptsByAssetId,
+            textOverlays: activePlanData?.textOverlays || [],
+            fontsDir: storageService.getFontsDir(),
+          });
+
+          if (fs.existsSync(assPath)) {
+            subtitleBurnOptions = {
+              assPath,
+              fontsDir: storageService.getFontsDir(),
+            };
+          }
+        } catch (assErr) {
+          console.warn('[RenderWorker] Subtitle generation warning:', assErr);
+        }
       }
 
       await logEvent(
         'Encoding',
         10,
-        `Starting FFmpeg ${qualityMode.toUpperCase()} render (${framePlatform}) as ${versionTag}`
+        `Starting ${qualityMode.toUpperCase()} render (${framePlatform}) as ${versionTag}`
       );
 
       // Step 8 Feature: Auto B-Roll Cutaway Resolution
@@ -527,9 +596,33 @@ export const renderWorker = new Worker<RenderJobData>(
         },
       });
 
+      // 10. Automated Post-Render Quality Check
+      await logEvent('Quality Check', 92, 'Running automatic quality verification (duration, freeze frames, loudness, safe margins)');
+      const expectedResParts = (frameResolution || '1080x1920').split('x');
+      const expectedResolution = {
+        width: parseInt(expectedResParts[0], 10) || 1080,
+        height: parseInt(expectedResParts[1], 10) || 1920,
+      };
+
+      try {
+        const qualityReport = await qualityCheckerService.checkAndFix(
+          exportPath,
+          activePlanData?.targetDurationSeconds || renderResult.duration || 25,
+          expectedResolution
+        );
+
+        await logEvent(
+          'Quality Check',
+          94,
+          `Quality check complete: ${qualityReport.status.toUpperCase()} (${qualityReport.fixesApplied.length} fix(es) applied)`
+        );
+      } catch (qErr) {
+        console.warn('[RenderWorker] Post-render quality check non-fatal notice:', qErr);
+      }
+
       await logEvent('Finalizing', 95, 'Verifying video stream integrity and generating thumbnail');
 
-      // 10. Generate Thumbnail
+      // 11. Generate Thumbnail
       const thumbFilename = `thumb_${versionTag}_${Date.now()}.jpg`;
       const thumbPath = storageService.getThumbnailPath(thumbFilename);
       let thumbUrl: string | null = null;

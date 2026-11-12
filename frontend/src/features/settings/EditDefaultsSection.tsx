@@ -14,8 +14,9 @@ export const EditDefaultsSection: React.FC = () => {
     musicMood: 'chill',
     logo: false,
     silenceRemoval: true,
-    speechAccuracy: 'standard',
+    speechAccuracy: 'high',
     speechLanguage: 'auto',
+    visualUnderstanding: false,
   };
 
   const [captions, setCaptions] = useState(defaults.captions);
@@ -24,8 +25,9 @@ export const EditDefaultsSection: React.FC = () => {
   const [musicMood, setMusicMood] = useState(defaults.musicMood || 'chill');
   const [logo, setLogo] = useState(defaults.logo);
   const [silenceRemoval, setSilenceRemoval] = useState(defaults.silenceRemoval);
-  const [speechAccuracy, setSpeechAccuracy] = useState<'standard' | 'high'>(defaults.speechAccuracy || 'standard');
+  const [speechAccuracy, setSpeechAccuracy] = useState<'standard' | 'high'>(defaults.speechAccuracy || 'high');
   const [speechLanguage, setSpeechLanguage] = useState(defaults.speechLanguage || 'auto');
+  const [visualUnderstanding, setVisualUnderstanding] = useState(defaults.visualUnderstanding ?? false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +40,7 @@ export const EditDefaultsSection: React.FC = () => {
       silenceRemoval,
       speechAccuracy,
       speechLanguage,
+      visualUnderstanding,
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
@@ -179,6 +182,31 @@ export const EditDefaultsSection: React.FC = () => {
               }`}
             />
           </button>
+        </div>
+
+        {/* Visual Understanding Toggle */}
+        <div className="p-3.5 rounded bg-[#121317] border border-[#23262D] space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-medium text-[#ECEDEF]">Visual Understanding</span>
+              <p className="text-[11px] text-[#8B909A]">
+                Sends sample frames to the edit service for scene context. Keep off for maximum privacy; local analysis will be used instead.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVisualUnderstanding(!visualUnderstanding)}
+              className={`w-9 h-5 rounded-full transition-colors relative ${
+                visualUnderstanding ? 'bg-[#C8A96A]' : 'bg-[#23262D]'
+              }`}
+            >
+              <div
+                className={`w-3.5 h-3.5 rounded-full bg-[#0B0C0E] absolute top-0.5 transition-transform ${
+                  visualUnderstanding ? 'right-1' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Speech Accuracy & Language */}

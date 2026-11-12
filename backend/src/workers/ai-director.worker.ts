@@ -2,6 +2,8 @@ import { Worker, Job } from '../queues/in-memory-queue.js';
 import { prisma } from '../config/database.js';
 import { geminiPlannerService } from '../services/gemini/gemini-planner.service.js';
 import { pythonBridgeService } from '../services/python/python-bridge.service.js';
+import { ruleEngineService } from '../services/rules/rule-engine.service.js';
+import { storageService } from '../services/storage/storage.service.js';
 
 export interface AIDirectorJobData {
   instructionId: string;
@@ -18,6 +20,7 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
       include: {
         project: {
           include: {
+            client: true,
             mediaAssets: {
               include: {
                 scenes: { orderBy: { sceneIndex: 'asc' } },
@@ -108,7 +111,46 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
         })),
       });
 
-      await job.updateProgress(80);
+      await job.updateProgress(75);
+
+      // Prepare quality contexts for Rule Engine (Layer 3 validation)
+      const assetContexts = instruction.project.mediaAssets.map((a: any) => {
+        let qualityAnalysis = undefined;
+        if (a.metadata?.rawMetadataJson) {
+          try {
+            const parsed = JSON.parse(a.metadata.rawMetadataJson);
+            qualityAnalysis = parsed.qualityAnalysis;
+          } catch {}
+        }
+        return {
+          id: a.id,
+          originalName: a.originalName || a.filename,
+          filename: a.filename,
+          storagePath: a.storagePath,
+          durationSeconds: a.durationSeconds || a.metadata?.duration || 10.0,
+          width: a.width || a.metadata?.width || 1920,
+          height: a.height || a.metadata?.height || 1080,
+          isPhoto: !a.hasAudio && !(a.scenes && a.scenes.length),
+          hasAudio: !!a.hasAudio,
+          qualityAnalysis,
+          transcriptionSegments: a.transcription?.segments?.map((seg: any) => ({
+            start: seg.startTime,
+            end: seg.endTime,
+            text: seg.text,
+          })),
+          silences,
+        };
+      });
+
+      console.log(`[AIDirectorWorker] Running Rule Engine validation & refinement on plan...`);
+      const verifiedPlan = await ruleEngineService.validateAndFixPlan({
+        plan,
+        assets: assetContexts,
+        targetPlatform: instruction.project.targetPlatform || 'YouTube 16:9',
+        targetDurationSeconds: instruction.targetDuration || undefined,
+      });
+
+      await job.updateProgress(85);
 
       // Save EditingPlan to DB
       await prisma.editingPlan.upsert({
@@ -116,28 +158,39 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
         create: {
           projectId: instruction.projectId,
           instructionId,
-          summary: plan.summary,
-          rationale: plan.explanation,
-          selectedScenesJson: JSON.stringify(plan.segments),
+          summary: verifiedPlan.summary,
+          rationale: verifiedPlan.explanation,
+          selectedScenesJson: JSON.stringify(verifiedPlan.segments),
           removedSilencesJson: JSON.stringify(silences),
-          captionPlanJson: JSON.stringify(plan.captions || []),
-          audioPlanJson: JSON.stringify(plan.audio || {}),
-          transitionsJson: JSON.stringify(plan.segments.map((s) => s.transition)),
-          targetDurationSeconds: plan.targetDurationSeconds,
+          captionPlanJson: JSON.stringify(verifiedPlan.captions || []),
+          audioPlanJson: JSON.stringify(verifiedPlan.audio || {}),
+          transitionsJson: JSON.stringify(verifiedPlan.segments.map((s) => s.transition)),
+          targetDurationSeconds: verifiedPlan.targetDurationSeconds,
           status: 'generated',
         },
         update: {
-          summary: plan.summary,
-          rationale: plan.explanation,
-          selectedScenesJson: JSON.stringify(plan.segments),
+          summary: verifiedPlan.summary,
+          rationale: verifiedPlan.explanation,
+          selectedScenesJson: JSON.stringify(verifiedPlan.segments),
           removedSilencesJson: JSON.stringify(silences),
-          captionPlanJson: JSON.stringify(plan.captions || []),
-          audioPlanJson: JSON.stringify(plan.audio || {}),
-          transitionsJson: JSON.stringify(plan.segments.map((s) => s.transition)),
-          targetDurationSeconds: plan.targetDurationSeconds,
+          captionPlanJson: JSON.stringify(verifiedPlan.captions || []),
+          audioPlanJson: JSON.stringify(verifiedPlan.audio || {}),
+          transitionsJson: JSON.stringify(verifiedPlan.segments.map((s) => s.transition)),
+          targetDurationSeconds: verifiedPlan.targetDurationSeconds,
           status: 'generated',
         },
       });
+
+      // Also persist to disk plans
+      try {
+        const clientName = (instruction.project as any)?.client?.name || 'General';
+        storageService.savePlanJson(clientName, instruction.project.title, {
+          plan: verifiedPlan,
+          version: 'v1',
+        });
+      } catch (storageErr) {
+        console.warn('[AIDirectorWorker] Non-fatal notice saving plan to storage:', storageErr);
+      }
 
       // Synchronize timeline: create default Video and Caption tracks
       let videoTrack = await prisma.timelineTrack.findFirst({
@@ -160,16 +213,16 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
         where: { trackId: videoTrack.id },
       });
 
-      // Insert new clips calculated by AI Director
+      // Insert new clips calculated by AI Director and Rule Engine
       let timelineCursor = 0;
-      for (let idx = 0; idx < plan.segments.length; idx++) {
-        const c = plan.segments[idx];
+      for (let idx = 0; idx < verifiedPlan.segments.length; idx++) {
+        const c = verifiedPlan.segments[idx];
         const clipDuration = (c.sourceOut - c.sourceIn) / (c.speed || 1.0);
 
         await prisma.timelineClip.create({
           data: {
             trackId: videoTrack.id,
-            mediaAssetId: primaryAsset.id,
+            mediaAssetId: c.assetId || primaryAsset.id,
             name: `Clip ${idx + 1} (${c.sourceIn.toFixed(1)}s - ${c.sourceOut.toFixed(1)}s)`,
             startTime: timelineCursor,
             duration: clipDuration,
@@ -184,7 +237,7 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
       }
 
       // Add Captions track if captions generated
-      if (plan.captions && plan.captions.length > 0) {
+      if (verifiedPlan.captions && verifiedPlan.captions.length > 0) {
         let captionTrack = await prisma.timelineTrack.findFirst({
           where: { projectId: instruction.projectId, trackType: 'caption' },
         });
@@ -202,7 +255,7 @@ export const aiDirectorWorker = new Worker<AIDirectorJobData>(
 
         await prisma.captionItem.deleteMany({ where: { trackId: captionTrack.id } });
 
-        for (const cap of plan.captions) {
+        for (const cap of verifiedPlan.captions) {
           await prisma.captionItem.create({
             data: {
               trackId: captionTrack.id,

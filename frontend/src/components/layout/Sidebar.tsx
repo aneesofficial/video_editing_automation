@@ -36,11 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
   return (
     <aside className="w-56 h-full flex flex-col bg-studio-surface border-r border-studio-border select-none z-20">
       {/* Brand Header */}
-      <div className="h-14 flex items-center px-4 border-b border-studio-border gap-2.5">
-        <img src="/logo.svg" alt={APP_NAME} className="w-7 h-7 rounded" />
-        <span className="font-semibold text-sm tracking-tight text-studio-text">
-          {APP_NAME}
-        </span>
+      <div className="h-14 flex items-center px-4 border-b border-studio-border">
+        <img src="/editron-logo.png" alt={APP_NAME} className="h-7 w-auto max-w-[155px] object-contain" />
       </div>
 
       {/* Main Navigation: Exactly 3 items */}

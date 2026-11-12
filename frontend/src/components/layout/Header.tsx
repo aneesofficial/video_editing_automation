@@ -1,8 +1,6 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Plus } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { useWorkspace } from '../../store/WorkspaceContext';
+import { useLocation } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { APP_NAME } from '../../config/brand';
 
 interface HeaderProps {
@@ -10,14 +8,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenMobileNav }) => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const { resetWorkspace } = useWorkspace();
-
-  const handleNewProjectClick = () => {
-    resetWorkspace();
-    navigate('/editor');
-  };
 
   const getPageTitle = () => {
     if (location.pathname.startsWith('/editor') || location.pathname.startsWith('/workspace')) {
@@ -42,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileNav }) => {
         </button>
 
         <div className="flex items-center gap-2">
+          <img src="/logo.svg" alt={APP_NAME} className="w-5 h-4 object-contain md:hidden" />
           <span className="text-xs font-semibold tracking-wider text-studio-muted uppercase">
             {APP_NAME}
           </span>
@@ -52,17 +44,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileNav }) => {
         </div>
       </div>
 
-      {/* Right: New Project CTA */}
-      <div className="flex items-center gap-3">
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<Plus className="w-4 h-4" />}
-          onClick={handleNewProjectClick}
-        >
-          New Project
-        </Button>
-      </div>
+      {/* Right */}
+      <div className="flex items-center gap-3" />
     </header>
   );
 };

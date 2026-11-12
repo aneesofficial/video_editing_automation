@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { env, getMaskedApiKey, updateEnvFile } from '../../config/env.js';
+import { resolvePlatformPreset, PlatformPreset } from '../rules/platform-presets.js';
 
 export const GeminiSegmentSchema = z.object({
   assetId: z.string(),
@@ -18,8 +19,12 @@ export const GeminiSegmentSchema = z.object({
       end: z.number().default(0),
     })
     .optional(),
+  jCut: z.number().optional(),
+  lCut: z.number().optional(),
   reason: z.string().optional().default(''),
 });
+
+export type GeminiSegment = z.infer<typeof GeminiSegmentSchema>;
 
 export const GeminiCaptionSchema = z.object({
   startTime: z.number().nonnegative(),
@@ -31,12 +36,16 @@ export const GeminiCaptionSchema = z.object({
   fontColor: z.string().optional().default('#ffffff'),
 });
 
+export type GeminiCaption = z.infer<typeof GeminiCaptionSchema>;
+
 export const GeminiTextOverlaySchema = z.object({
   startTime: z.number().nonnegative(),
   endTime: z.number().positive(),
   text: z.string(),
   position: z.string().default('center'),
 });
+
+export type GeminiTextOverlay = z.infer<typeof GeminiTextOverlaySchema>;
 
 export const GeminiBRollSegmentSchema = z.object({
   id: z.string().optional(),
@@ -50,6 +59,8 @@ export const GeminiBRollSegmentSchema = z.object({
   stockItem: z.any().optional(),
   removed: z.boolean().optional().default(false),
 });
+
+export type GeminiBRollSegment = z.infer<typeof GeminiBRollSegmentSchema>;
 
 export const GeminiEditingPlanSchema = z.object({
   summary: z.string(),
@@ -114,7 +125,20 @@ export interface PlanGenerationRequest {
   resolution: string;
   targetDurationSeconds?: number;
   autoBRoll?: boolean;
+  systemPrompt?: string;
   assets: MediaAssetAnalysisContext[];
+}
+
+export interface PlanRefinementRequest {
+  previousPlan: GeminiEditingPlan;
+  changeRequest: string;
+  assets: MediaAssetAnalysisContext[];
+  projectId?: string;
+  projectTitle?: string;
+  targetPlatform?: string;
+  aspectRatio?: string;
+  resolution?: string;
+  targetDurationSeconds?: number;
 }
 
 export interface AIStatusResponse {
@@ -287,8 +311,12 @@ export class GeminiPlannerService {
       throw new Error('Edit service key is not configured. Please paste your key in Settings.');
     }
 
+    const preset = resolvePlatformPreset(targetPlatform, aspectRatio);
+
     // 1. Build prompt for Gemini
-    let systemPrompt = `You are Studio Director, an elite autonomous video editor.
+    let systemPrompt = req.systemPrompt && req.systemPrompt.trim()
+      ? req.systemPrompt.trim()
+      : `You are Editron Director, an elite autonomous video editor.
 The user wants an automated edit of their media assets. You must decide every cut, motion effect, silence removal, caption, and music setting entirely by yourself based on the user's creative prompt and the provided local media analysis (transcription with timestamps, scene cuts from PySceneDetect, and silence intervals).
 
 STRICT RULES:
@@ -298,7 +326,21 @@ STRICT RULES:
 4. If the user mentions removing silences, or if silent intervals exist, skip or trim those intervals.
 5. If speech transcription is present, generate matching captions with accurate timestamps.
 6. When prompt asks for punchy/zoom/highlights, assign motionEffect ("zoom_in", "punch_in", "zoom_out", "pan_left") to impactful moments.
-7. Return ONLY valid JSON following the schema.`;
+7. Return ONLY valid JSON following the schema.
+
+PLATFORM PRESET CONSTRAINTS (${preset.name.toUpperCase()}):
+- Aspect ratio: ${preset.aspectRatio} (${preset.resolution}) at ${preset.fps} fps
+- Safe Margins: preserve top ${preset.safeMargins.topPercent}%, bottom ${preset.safeMargins.bottomPercent}%, right ${preset.safeMargins.rightPercent}% free of essential content/text.
+- Hook in first ${preset.hookDurationSeconds} seconds: MUST select the most engaging, highest quality moment from the footage.
+- Shot Lengths: between ${preset.shotLengthRange[0]}s and ${preset.shotLengthRange[1]}s (longer only if continuous speech).
+- Multi-Clip Distribution: You MUST use all ${assets.length} uploaded clips across the cut sequence. Do not omit any clip.
+- Single-Clip Rule: If only 1 clip is provided, use non-overlapping parts and never repeat the same 2 seconds of footage.
+- Target Duration: ${targetDurationSeconds || preset.targetDurationSeconds} seconds (tolerance +/- 10%, max ${preset.maxDurationSeconds}s).
+- Pacing: ${preset.pacing}. Fast in middle, clean decisive ending.`;
+
+    if (!systemPrompt.includes('PLATFORM PRESET CONSTRAINTS')) {
+      systemPrompt += `\n\nPLATFORM PRESET CONSTRAINTS (${preset.name.toUpperCase()}):\n- Aspect ratio: ${preset.aspectRatio} (${preset.resolution}) at ${preset.fps} fps\n- Safe Margins: preserve top ${preset.safeMargins.topPercent}%, bottom ${preset.safeMargins.bottomPercent}%, right ${preset.safeMargins.rightPercent}% free of essential content/text.\n- Target Duration: ${targetDurationSeconds || preset.targetDurationSeconds} seconds.\n- Pacing: ${preset.pacing}.`;
+    }
 
     if (req.autoBRoll) {
       systemPrompt += `\n8. AUTO B-ROLL IS REQUESTED: In 'bRollSegments', provide 1 to 3 relevant stock media cutaway suggestions. For each, specify 'keyword' (clear search terms for stock video, e.g. "aerial nature view", "hands typing on keyboard"), 'startTime' (seconds into edit), and 'duration' (between 2.0 and 4.0 seconds).`;
@@ -401,6 +443,192 @@ STRICT RULES:
     // Validate and sanitize the plan
     const validated = this.validateAndSanitizePlan(rawJsonResponse, req);
     return validated;
+  }
+
+  /**
+   * Refines an existing plan based on a user change request without starting from scratch.
+   */
+  public async refinePlan(req: PlanRefinementRequest): Promise<GeminiEditingPlan> {
+    const { previousPlan, changeRequest, assets, targetPlatform, aspectRatio, resolution, targetDurationSeconds } = req;
+    const preset = resolvePlatformPreset(targetPlatform || previousPlan.frame?.platform, aspectRatio || previousPlan.frame?.aspectRatio);
+    const key = env.GEMINI_API_KEY?.trim();
+
+    if (!key) {
+      console.log(`[GeminiPlanner] No edit key configured. Applying local refinement for: "${changeRequest}"`);
+      return this.refinePlanLocally(previousPlan, changeRequest, assets, preset);
+    }
+
+    const systemPrompt = `You are Editron Director, an elite autonomous video editor.
+The user wants to REFINE an existing video edit plan based on their specific change request.
+DO NOT START OVER OR RE-INVENT THE PLAN FROM SCRATCH.
+Preserve the existing segment structure, order, and good choices from the previous plan, but apply the user's specific modifications accurately:
+- If user requests pacing changes (e.g. "make it faster", "cut shorter"): reduce segment lengths or speed them up.
+- If user requests specific clip changes (e.g. "cut the second clip shorter", "remove clip 3"): adjust or trim that specific segment.
+- If user requests audio changes (e.g. "change music to calm", "no music"): adjust 'audio' settings (mood, enabled, volume).
+- If user requests caption changes (e.g. "no captions", "change caption style"): adjust or clear 'captions'.
+- If user requests aspect ratio / reframe (e.g. "reframe to vertical", "9:16"): update frame and adjust motionEffects (punch_in, ken_burns).
+- If user requests specific duration (e.g. "keep only best 15 seconds"): trim segments to fit the requested duration while keeping the highest-scoring moments.
+Return ONLY valid JSON following the schema.`;
+
+    const userMessageContent = `PREVIOUS EDIT PLAN:
+${JSON.stringify(previousPlan, null, 2)}
+
+USER CHANGE REQUEST:
+"${changeRequest}"
+
+AVAILABLE MEDIA ASSETS & FOOTAGE CONTEXT:
+${this.buildContextMessage({
+  projectId: req.projectId || '',
+  projectTitle: req.projectTitle || '',
+  assets,
+  userPrompt: changeRequest,
+  targetPlatform: targetPlatform || previousPlan.frame?.platform || 'Instagram Reel',
+  aspectRatio: aspectRatio || previousPlan.frame?.aspectRatio || '9:16',
+  resolution: resolution || previousPlan.frame?.resolution || '1080x1920',
+  targetDurationSeconds: targetDurationSeconds || previousPlan.targetDurationSeconds,
+})}`;
+
+    const requestBody: any = {
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userMessageContent }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+        responseSchema: this.getPlanJsonSchema(),
+      },
+    };
+
+    let rawJsonResponse: any = null;
+    const modelsToTry = [this.primaryModel, ...this.fallbackModels];
+
+    for (const model of modelsToTry) {
+      try {
+        console.log(`[GeminiPlanner] Requesting plan refinement via ${model}...`);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout(60000),
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            rawJsonResponse = JSON.parse(text);
+            break;
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[GeminiPlanner] Refinement attempt failed with ${model}:`, err.message);
+      }
+    }
+
+    if (!rawJsonResponse) {
+      console.log(`[GeminiPlanner] Falling back to local plan refinement for: "${changeRequest}"`);
+      return this.refinePlanLocally(previousPlan, changeRequest, assets, preset);
+    }
+
+    return this.validateAndSanitizePlan(rawJsonResponse, {
+      projectId: req.projectId || '',
+      projectTitle: req.projectTitle || '',
+      assets,
+      userPrompt: changeRequest,
+      targetPlatform: targetPlatform || previousPlan.frame?.platform || 'Instagram Reel',
+      aspectRatio: aspectRatio || previousPlan.frame?.aspectRatio || '9:16',
+      resolution: resolution || previousPlan.frame?.resolution || '1080x1920',
+      targetDurationSeconds: targetDurationSeconds || previousPlan.targetDurationSeconds,
+    });
+  }
+
+  /**
+   * Deterministic local refinement of an existing plan when offline.
+   */
+  private refinePlanLocally(
+    previousPlan: GeminiEditingPlan,
+    changeRequest: string,
+    assets: MediaAssetAnalysisContext[],
+    preset: PlatformPreset
+  ): GeminiEditingPlan {
+    const plan: GeminiEditingPlan = JSON.parse(JSON.stringify(previousPlan));
+    const reqLower = changeRequest.toLowerCase();
+
+    // 1. Pacing: "faster", "speed up", "quick", "snappy"
+    if (reqLower.includes('fast') || reqLower.includes('quick') || reqLower.includes('snappy') || reqLower.includes('speed')) {
+      for (const seg of plan.segments) {
+        const dur = seg.sourceOut - seg.sourceIn;
+        if (dur > 1.2) {
+          seg.sourceOut = Number((seg.sourceIn + Math.max(0.8, dur * 0.7)).toFixed(2));
+        }
+      }
+    }
+
+    // 2. Duration limit: "15 second", "30 second", "shorter"
+    const secMatch = reqLower.match(/(\d+)\s*(?:sec|second)/);
+    if (secMatch) {
+      const targetSec = parseInt(secMatch[1], 10);
+      if (targetSec > 0 && targetSec < 300) {
+        plan.targetDurationSeconds = targetSec;
+      }
+    } else if (reqLower.includes('short')) {
+      plan.targetDurationSeconds = Math.max(10, Math.round(plan.targetDurationSeconds * 0.75));
+    }
+
+    // 3. Captions: "no caption", "remove caption", "without caption", "disable caption"
+    if (reqLower.includes('no caption') || reqLower.includes('remove caption') || reqLower.includes('disable caption') || reqLower.includes('without caption')) {
+      plan.captions = [];
+    }
+
+    // 4. Music mood or disable: "no music", "mute music", "calm", "upbeat", "chill", "dramatic"
+    if (reqLower.includes('no music') || reqLower.includes('mute music') || reqLower.includes('without music')) {
+      plan.audio.musicEnabled = false;
+    } else {
+      for (const mood of ['calm', 'upbeat', 'chill', 'cinematic', 'dramatic', 'energetic', 'ambient']) {
+        if (reqLower.includes(mood)) {
+          plan.audio.musicEnabled = true;
+          plan.audio.mood = mood;
+          break;
+        }
+      }
+    }
+
+    // 5. Specific clip trimming: "cut the second clip shorter"
+    if (reqLower.includes('second clip') && plan.segments.length >= 2) {
+      const seg2 = plan.segments[1];
+      const curDur = seg2.sourceOut - seg2.sourceIn;
+      seg2.sourceOut = Number((seg2.sourceIn + Math.max(0.8, curDur * 0.5)).toFixed(2));
+    } else if (reqLower.includes('first clip') && plan.segments.length >= 1) {
+      const seg1 = plan.segments[0];
+      const curDur = seg1.sourceOut - seg1.sourceIn;
+      seg1.sourceOut = Number((seg1.sourceIn + Math.max(0.8, curDur * 0.5)).toFixed(2));
+    }
+
+    // 6. Platform / Reframe: "vertical", "9:16", "reel", "tiktok", "short", "horizontal", "16:9", "youtube"
+    if (reqLower.includes('vertical') || reqLower.includes('9:16') || reqLower.includes('reel') || reqLower.includes('tiktok') || reqLower.includes('short')) {
+      plan.frame.platform = 'Instagram Reel';
+      plan.frame.aspectRatio = '9:16';
+      plan.frame.resolution = '1080x1920';
+      for (const seg of plan.segments) {
+        if (seg.motionEffect === 'none') seg.motionEffect = 'punch_in';
+      }
+    } else if (reqLower.includes('horizontal') || reqLower.includes('16:9') || reqLower.includes('youtube')) {
+      plan.frame.platform = 'YouTube 16:9';
+      plan.frame.aspectRatio = '16:9';
+      plan.frame.resolution = '1920x1080';
+    }
+
+    plan.summary = `Refined edit: ${changeRequest}`;
+    plan.explanation = `Updated plan incorporating change request: "${changeRequest}"`;
+
+    return plan;
   }
 
   /**

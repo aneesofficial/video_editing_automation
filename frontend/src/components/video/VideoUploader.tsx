@@ -74,45 +74,19 @@ export const VideoUploader: React.FC = () => {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-xl ${
-          mediaItems.length > 0 ? 'p-4' : 'p-8'
-        } text-center cursor-pointer transition-all duration-200 select-none ${
+        className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 select-none ${
           isDragOver
             ? 'border-violet-500 bg-violet-600/10 scale-[0.99]'
             : 'border-studio-border hover:border-violet-500/50 hover:bg-studio-surface/60 bg-studio-surface/30'
         }`}
       >
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-2xl mx-auto">
-          <div className="flex items-center gap-3.5 text-left">
-            <div className="w-10 h-10 rounded-xl bg-studio-card border border-studio-border flex items-center justify-center text-violet-400 shadow-studio-sm flex-shrink-0">
-              <UploadCloud className="w-5 h-5" />
-            </div>
-
-            <div>
-              <h4 className="text-xs sm:text-sm font-semibold text-studio-text flex items-center gap-2">
-                <span>Drag &amp; Drop multiple videos or photos here</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-600/20 text-violet-300 border border-violet-500/30">
-                  Batch Upload
-                </span>
-              </h4>
-              <p className="text-[11px] text-studio-muted mt-0.5 leading-relaxed">
-                Accepts MP4, MOV, MKV, WebM, AVI, 3GP videos &amp; JPG, PNG, WebP, HEIC photos (up to 2 GB per file).
-              </p>
-            </div>
+        <div className="flex items-center justify-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-studio-card border border-studio-border flex items-center justify-center text-violet-400 shadow-studio-sm flex-shrink-0">
+            <UploadCloud className="w-5 h-5" />
           </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              isLoading={isUploadingAny}
-              onClick={() => fileInputRef.current?.click()}
-              leftIcon={<Plus className="w-3.5 h-3.5" />}
-            >
-              Browse Files
-            </Button>
-          </div>
+          <span className="text-sm font-semibold text-studio-text">
+            Drag &amp; Drop
+          </span>
         </div>
       </div>
 

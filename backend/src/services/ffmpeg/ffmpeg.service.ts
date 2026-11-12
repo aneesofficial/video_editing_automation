@@ -4,6 +4,7 @@ import path from 'node:path';
 import { env } from '../../config/env.js';
 import { storageService } from '../storage/storage.service.js';
 import { VideoMetadataResult } from './ffprobe.service.js';
+import { VideoAnalysisResult } from '../python/python-bridge.service.js';
 
 export interface RenderClip {
   filePath: string;
@@ -47,6 +48,10 @@ export interface PlanRenderSegment {
   motionEffect?: 'none' | 'zoom_in' | 'zoom_out' | 'pan_left' | 'pan_right' | 'punch_in' | 'ken_burns' | string;
   hasAudio?: boolean;
   isHdr?: boolean;
+  qualityAnalysis?: VideoAnalysisResult;
+  fps?: number;
+  jCut?: boolean;
+  lCut?: boolean;
 }
 
 export interface SubtitleBurnOptions {
@@ -622,77 +627,128 @@ export class FFmpegService {
       if (seg.isHdr) {
         preFilter.push('libplacebo=tonemapping=auto:colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv');
       }
+
+      // 4a. Light stabilization for shaky clips (deshake)
+      if (seg.qualityAnalysis?.shaky_clip || (seg.qualityAnalysis?.avg_shakiness || 0) > 0.035) {
+        preFilter.push('deshake=edge=mirror:rx=16:ry=16');
+      }
+
+      // 4a. Denoise if noisy or low light
+      const isLowLight = seg.qualityAnalysis?.seconds?.some((s) => s.is_too_dark);
+      if (isLowLight) {
+        preFilter.push('hqdn3d=1.5:1.5:3:3');
+      }
+
+      // 4a. Exposure & White balance normalization / subtle pro grade
+      const isDark = seg.qualityAnalysis?.seconds?.some((s) => s.is_too_dark);
+      const isBright = seg.qualityAnalysis?.seconds?.some((s) => s.is_too_bright);
+      if (isDark) {
+        preFilter.push('eq=contrast=1.06:brightness=0.05:saturation=1.03');
+      } else if (isBright) {
+        preFilter.push('eq=contrast=1.04:brightness=-0.04:saturation=1.02');
+      } else {
+        preFilter.push('eq=contrast=1.05:brightness=0.01:saturation=1.03');
+      }
+
+      // 4a. Light sharpening
+      preFilter.push('unsharp=lx=3:ly=3:la=0.4:cx=3:cy=3:ca=0.2');
+
       preFilter.push('fps=30');
       preFilter.push('format=yuv420p');
+
+      // 4b. Smooth speed ramps & slow motion
       if (!seg.isPhoto && speed !== 1.0) {
-        preFilter.push(`setpts=(PTS-STARTPTS)/${speed}`);
+        if (speed < 1.0 && (!seg.fps || seg.fps < 50)) {
+          preFilter.push(`minterpolate=fps=30:mi_mode=blend,setpts=(PTS-STARTPTS)/${speed}`);
+        } else {
+          preFilter.push(`setpts=(PTS-STARTPTS)/${speed}`);
+        }
       } else {
         preFilter.push('setpts=PTS-STARTPTS');
       }
-      preFilter.push(`split=2[v_bgin_${i}][v_fgin_${i}]`);
 
-      filterScriptLines.push(`[${i}:v]${preFilter.join(',')};`);
+      // 4a. Smart Reframe for vertical (9:16)
+      const isVerticalFrame = frame.aspectRatio === '9:16' || targetHeight > targetWidth;
+      const subjectX = seg.qualityAnalysis?.dominant_subject_x;
+      const hasSubject = !seg.isPhoto && subjectX !== undefined && subjectX >= 0.12 && subjectX <= 0.88;
 
-      // Blurred background: downscaled 1/4th -> boxblur -> scale to target frame
-      filterScriptLines.push(
-        `[v_bgin_${i}]scale=${blurWidth}:${blurHeight}:force_original_aspect_ratio=increase,crop=${blurWidth}:${blurHeight},boxblur=8:2,scale=${targetWidth}:${targetHeight},setsar=1[v_bg_${i}];`
-      );
+      if (isVerticalFrame && hasSubject) {
+        // Smart Reframe: follow face/subject smoothly without black bars or blur
+        filterScriptLines.push(`[${i}:v]${preFilter.join(',')}[v_pre_${i}];`);
+        filterScriptLines.push(
+          `[v_pre_${i}]scale=-2:${targetHeight}:force_original_aspect_ratio=increase,crop=${targetWidth}:${targetHeight}:x='min(max((${subjectX!.toFixed(2)}*in_w)-${targetWidth}/2,0),in_w-${targetWidth})':y=0,setsar=1[v_comp_${i}];`
+        );
+      } else {
+        // Fallback: blurred background + sharp foreground centered
+        filterScriptLines.push(`[${i}:v]${preFilter.join(',')},split=2[v_bgin_${i}][v_fgin_${i}];`);
+        filterScriptLines.push(
+          `[v_bgin_${i}]scale=${blurWidth}:${blurHeight}:force_original_aspect_ratio=increase,crop=${blurWidth}:${blurHeight},boxblur=8:2,scale=${targetWidth}:${targetHeight},setsar=1[v_bg_${i}];`
+        );
+        filterScriptLines.push(
+          `[v_fgin_${i}]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,setsar=1[v_fg_${i}];`
+        );
+        filterScriptLines.push(
+          `[v_bg_${i}][v_fg_${i}]overlay=(W-w)/2:(H-h)/2[v_comp_${i}];`
+        );
+      }
 
-      // Sharp foreground scaled to fit inside target frame
-      filterScriptLines.push(
-        `[v_fgin_${i}]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,setsar=1[v_fg_${i}];`
-      );
+      // 4b. Smoothstep motion effects (easing zoom & pan, max ~1.12x)
+      const durStr = dur.toFixed(3);
+      const smoothstepExpr = `(3*pow(t/${durStr},2)-2*pow(t/${durStr},3))`;
 
-      // Overlay centered
-      filterScriptLines.push(
-        `[v_bg_${i}][v_fg_${i}]overlay=(W-w)/2:(H-h)/2[v_comp_${i}];`
-      );
-
-      // Motion effect
       if (motion === 'zoom_in') {
         filterScriptLines.push(
-          `[v_comp_${i}]scale=eval=frame:w='trunc(${targetWidth}*(1+0.12*t/${dur.toFixed(3)})/2)*2':h='trunc(${targetHeight}*(1+0.12*t/${dur.toFixed(3)})/2)*2',crop=${targetWidth}:${targetHeight}:(in_w-out_w)/2:(in_h-out_h)/2[v${i}];`
+          `[v_comp_${i}]scale=eval=frame:w='trunc(${targetWidth}*(1+0.12*${smoothstepExpr})/2)*2':h='trunc(${targetHeight}*(1+0.12*${smoothstepExpr})/2)*2',crop=${targetWidth}:${targetHeight}:(in_w-out_w)/2:(in_h-out_h)/2[v${i}];`
         );
       } else if (motion === 'zoom_out') {
         filterScriptLines.push(
-          `[v_comp_${i}]scale=eval=frame:w='trunc(${targetWidth}*(1.12-0.12*t/${dur.toFixed(3)})/2)*2':h='trunc(${targetHeight}*(1.12-0.12*t/${dur.toFixed(3)})/2)*2',crop=${targetWidth}:${targetHeight}:(in_w-out_w)/2:(in_h-out_h)/2[v${i}];`
+          `[v_comp_${i}]scale=eval=frame:w='trunc(${targetWidth}*(1.12-0.12*${smoothstepExpr})/2)*2':h='trunc(${targetHeight}*(1.12-0.12*${smoothstepExpr})/2)*2',crop=${targetWidth}:${targetHeight}:(in_w-out_w)/2:(in_h-out_h)/2[v${i}];`
         );
       } else if (motion === 'punch_in') {
         filterScriptLines.push(
-          `[v_comp_${i}]scale=eval=frame:w='if(lt(t,0.2),trunc(${targetWidth}*(1+0.12*t/0.2)/2)*2,trunc(${targetWidth}*1.12/2)*2)':h='if(lt(t,0.2),trunc(${targetHeight}*(1+0.12*t/0.2)/2)*2,trunc(${targetHeight}*1.12/2)*2)',crop=${targetWidth}:${targetHeight}:(in_w-out_w)/2:(in_h-out_h)/2[v${i}];`
+          `[v_comp_${i}]scale=eval=frame:w='if(lt(t,0.25),trunc(${targetWidth}*(1+0.12*(3*pow(t/0.25,2)-2*pow(t/0.25,3)))/2)*2,trunc(${targetWidth}*1.12/2)*2)':h='if(lt(t,0.25),trunc(${targetHeight}*(1+0.12*(3*pow(t/0.25,2)-2*pow(t/0.25,3)))/2)*2,trunc(${targetHeight}*1.12/2)*2)',crop=${targetWidth}:${targetHeight}:(in_w-out_w)/2:(in_h-out_h)/2[v${i}];`
         );
       } else if (motion === 'pan_left') {
         const panW = Math.trunc((targetWidth * 1.1) / 2) * 2;
         const panH = Math.trunc((targetHeight * 1.1) / 2) * 2;
         filterScriptLines.push(
-          `[v_comp_${i}]scale=${panW}:${panH},crop=${targetWidth}:${targetHeight}:x='(in_w-out_w)*(1-t/${dur.toFixed(3)})':y='(in_h-out_h)/2'[v${i}];`
+          `[v_comp_${i}]scale=${panW}:${panH},crop=${targetWidth}:${targetHeight}:x='(in_w-out_w)*(1-${smoothstepExpr})':y='(in_h-out_h)/2'[v${i}];`
         );
       } else if (motion === 'pan_right') {
         const panW = Math.trunc((targetWidth * 1.1) / 2) * 2;
         const panH = Math.trunc((targetHeight * 1.1) / 2) * 2;
         filterScriptLines.push(
-          `[v_comp_${i}]scale=${panW}:${panH},crop=${targetWidth}:${targetHeight}:x='(in_w-out_w)*(t/${dur.toFixed(3)})':y='(in_h-out_h)/2'[v${i}];`
+          `[v_comp_${i}]scale=${panW}:${panH},crop=${targetWidth}:${targetHeight}:x='(in_w-out_w)*${smoothstepExpr}':y='(in_h-out_h)/2'[v${i}];`
         );
       } else if (motion === 'ken_burns') {
         filterScriptLines.push(
-          `[v_comp_${i}]scale=eval=frame:w='trunc(${targetWidth}*(1+0.10*t/${dur.toFixed(3)})/2)*2':h='trunc(${targetHeight}*(1+0.10*t/${dur.toFixed(3)})/2)*2',crop=${targetWidth}:${targetHeight}:x='(in_w-out_w)*(0.2+0.6*t/${dur.toFixed(3)})':y='(in_h-out_h)*(0.2+0.6*t/${dur.toFixed(3)})'[v${i}];`
+          `[v_comp_${i}]scale=eval=frame:w='trunc(${targetWidth}*(1+0.08*${smoothstepExpr})/2)*2':h='trunc(${targetHeight}*(1+0.08*${smoothstepExpr})/2)*2',crop=${targetWidth}:${targetHeight}:x='(in_w-out_w)*(0.2+0.6*${smoothstepExpr})':y='(in_h-out_h)*(0.2+0.6*${smoothstepExpr})'[v${i}];`
         );
       } else {
         filterScriptLines.push(`[v_comp_${i}]null[v${i}];`);
       }
 
-      // --- AUDIO CHAIN FOR SEGMENT i ---
+      // --- 4c. AUDIO CHAIN FOR SEGMENT i ---
       if (seg.isPhoto || !seg.hasAudio) {
         // Generate clean silent audio of exact duration
         filterScriptLines.push(
-          `aevalsrc=0:d=${dur.toFixed(3)}:s=44100:c=stereo,asetpts=PTS-STARTPTS[a${i}];`
+          `aevalsrc=0:d=${dur.toFixed(3)}:s=48000:c=stereo,asetpts=PTS-STARTPTS[a${i}];`
         );
       } else {
         const aFilters: string[] = [];
         if (speed !== 1.0) {
-          aFilters.push(`atempo=${speed}`);
+          if (speed < 0.5) {
+            aFilters.push(`atempo=0.8,atempo=${(speed / 0.8).toFixed(3)}`);
+          } else {
+            aFilters.push(`atempo=${speed.toFixed(3)}`);
+          }
         }
-        aFilters.push('aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo');
+        // Voice cleanup: 80Hz highpass, gentle denoise, light compression
+        aFilters.push('highpass=f=80,afftdn=nf=-25,acompressor=threshold=-18dB:ratio=3:attack=5:release=50:makeup=2');
+        // 10-20ms fade in/out at each cut to eliminate pops
+        const cutFade = Math.min(0.015, dur * 0.1);
+        aFilters.push(`afade=t=in:ss=0:d=${cutFade.toFixed(3)},afade=t=out:st=${Math.max(0.01, dur - cutFade).toFixed(3)}:d=${cutFade.toFixed(3)}`);
+        aFilters.push('aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo');
         aFilters.push('asetpts=PTS-STARTPTS');
         filterScriptLines.push(`[${i}:a]${aFilters.join(',')}[a${i}];`);
       }
@@ -852,8 +908,9 @@ export class FFmpegService {
       }
     }
 
-    // Audio loudness normalization (-16 LUFS broadcast standard)
-    filterScriptLines.push(`${finalAudioTag}loudnorm=I=-16:TP=-1.5:LRA=11[a_final]`);
+    // Audio loudness normalization (-14 LUFS broadcast standard, -1 dB true peak with subtle fades)
+    const audioOutStart = Math.max(0.1, calculatedTotalDuration - 0.4).toFixed(3);
+    filterScriptLines.push(`${finalAudioTag}afade=t=in:ss=0:d=0.25,afade=t=out:st=${audioOutStart}:d=0.4,loudnorm=I=-14:TP=-1:LRA=11[a_final]`);
 
     // Write filter graph to script file (for reference/auditing)
     const scriptPath = storageService.getTempPath(`filter_script_${jobId}_${Date.now()}.txt`);
@@ -875,21 +932,28 @@ export class FFmpegService {
       } else {
         args.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26');
       }
-      args.push('-c:a', 'aac', '-b:a', '128k');
+      args.push('-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2');
     } else {
       if (encoder === 'h264_nvenc') {
-        args.push('-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '18');
+        args.push('-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '17');
       } else if (encoder === 'h264_qsv') {
-        args.push('-c:v', 'h264_qsv', '-preset', 'medium', '-global_quality', '18');
+        args.push('-c:v', 'h264_qsv', '-preset', 'medium', '-global_quality', '17');
       } else {
-        args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '18');
+        args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '17');
       }
-      args.push('-c:a', 'aac', '-b:a', '192k');
+      args.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2');
     }
 
     if (encoder === 'libx264') {
       args.push('-x264-params', 'no-info=1');
     }
+
+    // Professional Rec.709 color space and standard color range for mobile screen parity
+    args.push('-color_primaries', 'bt709');
+    args.push('-color_trc', 'bt709');
+    args.push('-colorspace', 'bt709');
+    args.push('-color_range', 'tv');
+    args.push('-r', '30');
 
     // Strip tool names and metadata from exported file
     args.push('-map_metadata', '-1');

@@ -26,10 +26,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   return (
     <div
       onClick={() => onOpen(project)}
-      className="group relative bg-[#121317] border border-[#23262D] hover:border-[#C8A96A]/60 rounded overflow-hidden flex flex-col transition-colors cursor-pointer select-none"
+      className={`group relative bg-[#121317] border border-[#23262D] hover:border-[#C8A96A]/60 rounded flex flex-col transition-colors cursor-pointer select-none ${
+        showMenu ? 'z-30' : 'z-0'
+      }`}
     >
       {/* Thumbnail area */}
-      <div className="relative aspect-video w-full bg-[#0B0C0E] border-b border-[#23262D] flex items-center justify-center overflow-hidden">
+      <div className="relative aspect-video w-full bg-[#0B0C0E] border-b border-[#23262D] flex items-center justify-center overflow-hidden rounded-t">
         {project.thumbnailUrl && !imgError ? (
           <img
             src={project.thumbnailUrl}
@@ -81,12 +83,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             {showMenu && (
               <>
                 <div
-                  className="fixed inset-0 z-20"
-                  onClick={() => setShowMenu(false)}
+                  className="fixed inset-0 z-40"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                  }}
                 />
-                <div className="absolute right-0 top-6 w-32 bg-[#181A1F] border border-[#23262D] rounded shadow-subtle py-1 z-30">
+                <div className="absolute right-0 top-7 w-32 bg-[#181A1F] border border-[#23262D] rounded shadow-xl py-1 z-50">
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowMenu(false);
                       onOpen(project);
                     }}
@@ -96,7 +102,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                     <span>Open</span>
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowMenu(false);
                       onRename(project);
                     }}
@@ -106,11 +113,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                     <span>Rename</span>
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowMenu(false);
                       onDelete(project.id);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[#C75B5B] hover:bg-[#C75B5B]/10 text-left transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#C75B5B] hover:bg-[#C75B5B]/15 text-left transition-colors font-medium border-t border-[#23262D]"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-[#C75B5B]" />
                     <span>Delete</span>

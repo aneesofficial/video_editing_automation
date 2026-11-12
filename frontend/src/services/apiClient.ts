@@ -927,6 +927,7 @@ class ApiClient {
       resolution?: string;
       targetDurationSeconds?: number;
       autoBRoll?: boolean;
+      systemPrompt?: string;
     }
   ): Promise<{ success: boolean; data: { plan: GeminiEditingPlan; planId: string; version: string; filePath: string } }> {
     const res = await fetch(`${this.baseUrl}/api/v1/projects/${projectId}/edit-plan`, {
@@ -1245,6 +1246,7 @@ class ApiClient {
       cutSilences?: boolean;
       generateCaptions?: boolean;
       backgroundMusic?: boolean;
+      systemPrompt?: string;
     }
   ) {
     return this.generateAiPlan(projectId, {
@@ -1253,6 +1255,7 @@ class ApiClient {
       aspectRatio: payload.aspectRatio,
       resolution: payload.resolution,
       autoBRoll: payload.enableStockBRoll,
+      systemPrompt: payload.systemPrompt,
     });
   }
 

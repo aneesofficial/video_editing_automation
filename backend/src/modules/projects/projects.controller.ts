@@ -5,9 +5,10 @@ import path from 'node:path';
 import { prisma } from '../../config/database.js';
 import { storageService, sanitizeWindowsName } from '../../services/storage/storage.service.js';
 import { previewService, isPhotoMedia } from '../../services/preview/preview.service.js';
-import { geminiPlannerService } from '../../services/gemini/gemini-planner.service.js';
+import { geminiPlannerService, GeminiEditingPlan } from '../../services/gemini/gemini-planner.service.js';
 import { pythonBridgeService } from '../../services/python/python-bridge.service.js';
 import { stockService } from '../../services/stock/stock.service.js';
+import { ruleEngineService } from '../../services/rules/rule-engine.service.js';
 
 export const CreateProjectSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -41,8 +42,32 @@ function sanitizeNotes(notes: string | null | undefined): string | null {
   if (!notes) return notes || null;
   return notes
     .replace(/\s*•\s*libx264\b/gi, '')
-    .replace(/\b(gemini|google|ollama|whisper|ffmpeg|ffprobe|libx264|onnx|u2net)\b/gi, 'service')
+    .replace(/\b(gemini|google|ollama|whisper|ffmpeg|ffprobe|libx264|onnx|u2net|pexels|pixabay)\b/gi, 'service')
     .trim();
+}
+
+function sanitizePreferences(pref: any): any {
+  if (!pref || typeof pref !== 'object') return pref;
+  const cloned = { ...pref };
+  if (cloned.stockLicenses && typeof cloned.stockLicenses === 'object') {
+    const cleanLicenses: Record<string, any> = {};
+    for (const [k, v] of Object.entries(cloned.stockLicenses)) {
+      if (v && typeof v === 'object') {
+        cleanLicenses[k] = {
+          ...(v as any),
+          source: 'Stock Library',
+          pageUrl: '',
+          creatorName: (v as any).creatorName || 'Contributor',
+          creatorUrl: '',
+          licenseUrl: '',
+          licenseName: 'Standard Content License',
+          stockId: `asset_${k.slice(0, 8)}`,
+        };
+      }
+    }
+    cloned.stockLicenses = cleanLicenses;
+  }
+  return cloned;
 }
 
 export class ProjectsController {
@@ -87,19 +112,23 @@ export class ProjectsController {
     });
 
     // Format parsed tags and preferences for frontend
-    const formatted = projects.map((p: any) => ({
-      ...p,
-      tags: p.tagsJson ? JSON.parse(p.tagsJson) : [],
-      preferences: p.preferencesJson ? JSON.parse(p.preferencesJson) : null,
-      versions: (p.versions || []).map((v: any) => ({
-        ...v,
-        notes: sanitizeNotes(v.notes),
-      })),
-      exportedFiles: (p.exportedFiles || []).map((e: any) => ({
-        ...e,
-        notes: sanitizeNotes(e.notes),
-      })),
-    }));
+    const formatted = projects.map((p: any) => {
+      const cleanPref = sanitizePreferences(p.preferencesJson ? JSON.parse(p.preferencesJson) : null);
+      return {
+        ...p,
+        preferences: cleanPref,
+        preferencesJson: cleanPref ? JSON.stringify(cleanPref) : null,
+        tags: p.tagsJson ? JSON.parse(p.tagsJson) : [],
+        versions: (p.versions || []).map((v: any) => ({
+          ...v,
+          notes: sanitizeNotes(v.notes),
+        })),
+        exportedFiles: (p.exportedFiles || []).map((e: any) => ({
+          ...e,
+          notes: sanitizeNotes(e.notes),
+        })),
+      };
+    });
 
     return reply.send({ success: true, data: formatted });
   }
@@ -180,7 +209,8 @@ export class ProjectsController {
       };
     });
 
-    const preferences = project.preferencesJson ? JSON.parse(project.preferencesJson) : null;
+    const rawPreferences = project.preferencesJson ? JSON.parse(project.preferencesJson) : null;
+    const preferences = sanitizePreferences(rawPreferences);
     const mediaOrder = preferences?.mediaOrder;
     if (Array.isArray(mediaOrder) && mediaOrder.length > 0) {
       const orderMap = new Map(mediaOrder.map((id: string, idx: number) => [id, idx]));
@@ -228,6 +258,7 @@ export class ProjectsController {
       mediaAssets: mediaAssetsWithUrls,
       tags: project.tagsJson ? JSON.parse(project.tagsJson) : [],
       preferences,
+      preferencesJson: preferences ? JSON.stringify(preferences) : null,
       versions: (project.versions || []).map((v: any) => ({
         ...v,
         notes: sanitizeNotes(v.notes),
@@ -605,6 +636,7 @@ export class ProjectsController {
       where: { id },
       include: {
         client: true,
+        editingPlans: { orderBy: { createdAt: 'desc' } },
         mediaAssets: {
           include: {
             metadata: true,
@@ -760,17 +792,106 @@ export class ProjectsController {
     }
 
     try {
-      // Call Gemini planner
-      const plan = await geminiPlannerService.generatePlan({
-        projectId: id,
-        projectTitle: project.title,
-        userPrompt,
+      // Step 13B Part 6: Check for previous plan to refine rather than starting from scratch
+      const diskPlans = storageService.listPlanJsons(clientName, project.title);
+      let previousPlan: GeminiEditingPlan | null = null;
+      if (diskPlans.length > 0) {
+        previousPlan = diskPlans[0].data?.plan;
+      }
+      if (!previousPlan && (project as any).editingPlans && (project as any).editingPlans.length > 0) {
+        try {
+          const dbPlan = (project as any).editingPlans[0];
+          previousPlan = {
+            summary: dbPlan.summary,
+            explanation: dbPlan.rationale,
+            targetDurationSeconds: dbPlan.targetDurationSeconds,
+            frame: {
+              platform: targetPlatform,
+              aspectRatio,
+              resolution,
+            },
+            segments: JSON.parse(dbPlan.selectedScenesJson || '[]'),
+            captions: dbPlan.captionPlanJson ? JSON.parse(dbPlan.captionPlanJson) : [],
+            audio: dbPlan.audioPlanJson ? JSON.parse(dbPlan.audioPlanJson) : { musicEnabled: false, mood: 'upbeat', volume: 0.2, ducking: true },
+            silenceRemoval: { enabled: true, removedIntervals: [] },
+            textOverlays: [],
+            bRollSegments: [],
+          };
+        } catch {}
+      }
+
+      const promptLower = userPrompt.toLowerCase();
+      const isRevision = Boolean(
+        previousPlan &&
+        ((body as any).isRevision ||
+         promptLower.includes('revision') ||
+         promptLower.includes('change') ||
+         promptLower.includes('faster') ||
+         promptLower.includes('slower') ||
+         promptLower.includes('cut') ||
+         promptLower.includes('music') ||
+         promptLower.includes('caption') ||
+         promptLower.includes('reframe') ||
+         diskPlans.length > 0)
+      );
+
+      let plan: GeminiEditingPlan;
+      if (isRevision && previousPlan) {
+        console.log(`[AI Planner] Refining previous plan (${diskPlans[0]?.version || 'v1'}) with change request: "${userPrompt}"...`);
+        plan = await geminiPlannerService.refinePlan({
+          previousPlan,
+          changeRequest: userPrompt,
+          assets: mediaContexts,
+          projectId: id,
+          projectTitle: project.title,
+          targetPlatform,
+          aspectRatio,
+          resolution,
+          targetDurationSeconds,
+        });
+      } else {
+        // Initial plan generation via Gemini planner
+        plan = await geminiPlannerService.generatePlan({
+          projectId: id,
+          projectTitle: project.title,
+          userPrompt,
+          targetPlatform,
+          aspectRatio,
+          resolution,
+          targetDurationSeconds,
+          autoBRoll: Boolean(body.autoBRoll),
+          systemPrompt: (body as any).systemPrompt,
+          assets: mediaContexts,
+        });
+      }
+
+      // Layer 3: Rule Engine validation & refinement
+      const qualityContexts = project.mediaAssets.map((a: any) => {
+        let qualityAnalysis = undefined;
+        if (a.metadata?.rawMetadataJson) {
+          try {
+            qualityAnalysis = JSON.parse(a.metadata.rawMetadataJson).qualityAnalysis;
+          } catch {}
+        }
+        return {
+          id: a.id,
+          originalName: a.originalName || a.filename,
+          filename: a.filename,
+          storagePath: a.storagePath,
+          durationSeconds: a.durationSeconds || a.metadata?.duration || 10.0,
+          width: a.width || a.metadata?.width || 1920,
+          height: a.height || a.metadata?.height || 1080,
+          isPhoto: !a.hasAudio && !(a.scenes && a.scenes.length),
+          hasAudio: !!a.hasAudio,
+          qualityAnalysis,
+        };
+      });
+
+      plan = await ruleEngineService.validateAndFixPlan({
+        plan,
+        assets: qualityContexts,
         targetPlatform,
-        aspectRatio,
-        resolution,
-        targetDurationSeconds,
-        autoBRoll: Boolean(body.autoBRoll),
-        assets: mediaContexts,
+        targetDurationSeconds: plan.targetDurationSeconds,
       });
 
       // Auto B-roll import if enabled

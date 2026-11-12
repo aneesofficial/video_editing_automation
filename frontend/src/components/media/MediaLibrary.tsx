@@ -12,7 +12,6 @@ import {
   GripVertical,
   ChevronLeft,
   ChevronRight,
-  FolderOpen,
   ShieldCheck,
   ExternalLink,
 } from 'lucide-react';
@@ -136,26 +135,16 @@ export const MediaLibrary: React.FC = () => {
   return (
     <div className="bg-studio-surface border border-studio-border rounded-xl overflow-hidden shadow-studio">
       {/* Header Bar */}
-      <div className="p-4 bg-studio-card/80 border-b border-studio-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-            <FolderOpen className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-white">Media Library</h3>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-studio-surface border border-studio-border text-violet-300">
-                {totalCount} {totalCount === 1 ? 'item' : 'items'}
-              </span>
-            </div>
-            <p className="text-[11px] text-studio-muted">
-              Project raw assets &amp; browser-safe preview copies. Drag cards to reorder.
-            </p>
-          </div>
+      <div className="p-4 bg-studio-card/80 border-b border-studio-border flex flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-white">Media Library</h3>
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-studio-surface border border-studio-border text-violet-300">
+            {totalCount} {totalCount === 1 ? 'item' : 'items'}
+          </span>
         </div>
 
-        {/* Search & Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Search & Filter Controls in One Straight Line */}
+        <div className="flex items-center gap-2.5">
           {/* Search Box */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-studio-subtle pointer-events-none" />
@@ -207,17 +196,9 @@ export const MediaLibrary: React.FC = () => {
       {/* Cards Grid */}
       <div className="p-4">
         {filteredItems.length === 0 ? (
-          <div className="py-10 text-center flex flex-col items-center justify-center space-y-2">
-            <div className="w-12 h-12 rounded-xl bg-studio-card border border-studio-border flex items-center justify-center text-studio-subtle">
-              <Film className="w-6 h-6" />
-            </div>
+          <div className="py-8 text-center flex flex-col items-center justify-center">
             <p className="text-sm font-medium text-studio-text">
               {searchQuery || filterType !== 'all' ? 'No matching media files' : 'No media in this project yet'}
-            </p>
-            <p className="text-xs text-studio-muted max-w-sm">
-              {searchQuery || filterType !== 'all'
-                ? 'Try adjusting your search query or switching filters above.'
-                : 'Upload videos (MP4, MOV, MKV, WebM, AVI, 3GP) or photos (JPG, PNG, WebP, HEIC) above.'}
             </p>
           </div>
         ) : (

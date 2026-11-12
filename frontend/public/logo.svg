@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
-  <rect width="40" height="40" rx="8" fill="#121317" stroke="#23262D" stroke-width="1.5"/>
-  <text x="20" y="27" font-family="Inter, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#C8A96A" text-anchor="middle">S</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 110" width="140" height="110">
+  <polygon points="16,0 117,0 102,21 0,21" fill="#C8A96A" />
+  <polygon points="33,42 135,42 119,63 17,63" fill="#C8A96A" />
+  <polygon points="16,84 93,84 78,105 0,105" fill="#C8A96A" />
 </svg>
-

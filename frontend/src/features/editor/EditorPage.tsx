@@ -268,6 +268,7 @@ export const EditorPage: React.FC = () => {
         cutSilences: settings.editDefaults?.silenceRemoval ?? true,
         generateCaptions: settings.editDefaults?.captions ?? true,
         backgroundMusic: settings.editDefaults?.music ?? false,
+        systemPrompt: settings.systemPrompt,
       });
 
       const planVersion = planRes.data.version;
@@ -326,6 +327,7 @@ export const EditorPage: React.FC = () => {
         aspectRatio: curFormat.aspectRatio,
         resolution: curFormat.resolution,
         enableStockBRoll: addExtraFootage,
+        systemPrompt: settings.systemPrompt,
       });
 
       const newPlanVersion = planRes.data.version;
@@ -344,7 +346,7 @@ export const EditorPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-[920px] mx-auto space-y-6">
+    <div className="w-full max-w-none p-6 md:p-8 space-y-6">
       {/* Top Bar: Switch "Video | Photo" */}
       <div className="flex items-center justify-between border-b border-[#23262D] pb-4">
         <div className="flex items-center gap-1 p-0.5 rounded bg-[#121317] border border-[#23262D]">
@@ -588,7 +590,9 @@ export const EditorPage: React.FC = () => {
                       const isSelected = selectedVersionId === v.id;
                       const isDraft = (v.resolution && v.resolution.includes('720')) || (v.format && v.format.includes('draft'));
                       const label = isDraft ? 'Draft' : 'Final';
-                      const versionDisplay = `Version ${versions.length - idx}`;
+                      const versionDisplay = v.versionTag
+                        ? v.versionTag.toUpperCase()
+                        : `Version ${v.versionNumber || (versions.length - idx)}`;
 
                       return (
                         <div

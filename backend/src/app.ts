@@ -51,6 +51,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   });
 
+  // Ensure .quality.json metadata files are never served to the browser or downloaded
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.url.toLowerCase().includes('.quality.json')) {
+      return reply.status(404).send({ success: false, error: 'Not found' });
+    }
+  });
+
   // Serve static files from storage directory
   const storagePath = storageService.getBaseDir();
   await app.register(fastifyStatic, {
@@ -59,12 +66,29 @@ export async function buildApp(): Promise<FastifyInstance> {
     decorateReply: false,
   });
 
-  // Strip X-Powered-By and Server headers from all responses
-  app.addHook('onSend', async (_request, reply) => {
+  // Strip X-Powered-By and Server headers from all responses and sanitize body payload
+  app.addHook('onSend', async (_request, reply, payload) => {
     reply.removeHeader('X-Powered-By');
     reply.removeHeader('x-powered-by');
     reply.removeHeader('Server');
     reply.removeHeader('server');
+
+    if (typeof payload === 'string') {
+      let sanitized = payload;
+      // Mask full local file paths
+      sanitized = sanitized.replace(/[a-zA-Z]:\\[Uu]sers\\[^\s"'\\]+(?:\\[^\s"'\\]+)*/g, '[path]');
+      sanitized = sanitized.replace(/\/(Users|home|var|usr|etc)\/[^\s"'/]+(?:\/[^\s"'/]+)*/g, '[path]');
+      // Mask forbidden vendor/tool names
+      sanitized = sanitized.replace(
+        /\b(gemini|google|ollama|whisper|ffmpeg|ffprobe|libx264|onnx|u2net|pexels|pixabay|fastify|sqlite|prisma)\b/gi,
+        'service'
+      );
+      if (sanitized !== payload) {
+        reply.header('content-length', Buffer.byteLength(sanitized));
+        return sanitized;
+      }
+    }
+    return payload;
   });
 
   // Centralized Sanitized Error Handler (no stack traces or file paths to client)

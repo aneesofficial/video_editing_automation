@@ -15,6 +15,7 @@ export interface EditDefaults {
   silenceRemoval: boolean;
   speechAccuracy: 'standard' | 'high';
   speechLanguage: string;
+  visualUnderstanding?: boolean;
 }
 
 export interface ExportDefaults {

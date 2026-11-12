@@ -10,6 +10,7 @@ interface SettingsContextType {
   updateExportDefaults: (defaults: Partial<ExportDefaults>) => void;
   updatePreferences: (prefs: Partial<WorkspacePreferences>) => void;
   updateBackendConfig: (config: Partial<BackendConfig>) => void;
+  updateSystemPrompt: (prompt: string) => void;
   testBackendConnection: () => Promise<void>;
   isTestingConnection: boolean;
 }
@@ -65,6 +66,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  const updateSystemPrompt = (systemPrompt: string) => {
+    setSettings((prev) => {
+      const updated = { ...prev, systemPrompt };
+      settingsStorage.save(updated);
+      return updated;
+    });
+  };
+
   const testBackendConnection = async () => {
     setIsTestingConnection(true);
     updateBackendConfig({ status: 'checking', errorMessage: null });
@@ -98,6 +107,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateExportDefaults,
         updatePreferences,
         updateBackendConfig,
+        updateSystemPrompt,
         testBackendConnection,
         isTestingConnection,
       }}

@@ -52,3 +52,7 @@ test-fixtures*/
 # Backups
 backend/backups/
 backups/
+
+# Progress & Internal files
+backend/PROGRESS_*.md
+*.quality.json

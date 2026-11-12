@@ -67,15 +67,37 @@ export const analysisWorker = new Worker<AnalysisJobData>(
         console.warn(`[AnalysisWorker] Scene detection non-fatal warning for ${mediaAsset.filename}:`, sceneErr);
       }
 
-      await job.updateProgress(80);
+      // 3. Local Computer Vision & Quality Analysis
+      await job.updateProgress(70);
+      console.log(`[AnalysisWorker] Running local footage quality analysis for ${mediaAsset.filename}...`);
+      try {
+        const qualityAnalysis = await pythonBridgeService.analyzeVideo(mediaAsset.storagePath, 1.0);
+        // Persist analysis in metadata
+        const existingMeta = await prisma.videoMetadata.findUnique({ where: { mediaAssetId } });
+        if (existingMeta) {
+          let currentJson: any = {};
+          try {
+            if (existingMeta.rawMetadataJson) currentJson = JSON.parse(existingMeta.rawMetadataJson);
+          } catch {}
+          currentJson.qualityAnalysis = qualityAnalysis;
+          await prisma.videoMetadata.update({
+            where: { mediaAssetId },
+            data: { rawMetadataJson: JSON.stringify(currentJson) },
+          });
+        }
+      } catch (analErr) {
+        console.warn(`[AnalysisWorker] Video analysis warning for ${mediaAsset.filename}:`, analErr);
+      }
 
-      // 3. Mark analyzed
+      await job.updateProgress(85);
+
+      // 4. Mark analyzed
       const updatedAsset = await prisma.mediaAsset.update({
         where: { id: mediaAssetId },
         data: { status: 'analyzed' },
       });
 
-      // 4. Enqueue transcription if asset has audio
+      // 5. Enqueue transcription if asset has audio
       if (updatedAsset.hasAudio) {
         await transcriptionQueue.add('transcribe', { mediaAssetId });
       }

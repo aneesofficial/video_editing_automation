@@ -88,13 +88,11 @@ export const HomePage: React.FC = () => {
   }, [projects, searchQuery, selectedClient]);
 
   return (
-    <div className="p-6 md:p-8 max-w-[920px] mx-auto space-y-6">
+    <div className="w-full max-w-none p-6 md:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[#23262D] pb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-[#ECEDEF] tracking-tight">
-            {APP_NAME}
-          </h1>
+        <div className="flex items-center gap-3">
+          <img src="/editron-logo.png" alt={APP_NAME} className="h-7 w-auto max-w-[170px] object-contain" />
         </div>
 
         <Button
@@ -150,7 +148,7 @@ export const HomePage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
           {filteredProjects.map((project) => (
             <ProjectCard
               key={project.id}

@@ -1,9 +1,9 @@
 @echo off
-title Studio Launcher
+title Editron Launcher
 cd /d "%~dp0"
 
 echo ===================================================
-echo               STARTING STUDIO
+echo               STARTING EDITRON
 echo ===================================================
 echo.
 
@@ -16,17 +16,17 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [1/3] Starting Backend Server (Port 3001)...
-start "Studio Backend" cmd /k "cd /d ""%~dp0backend"" && npm run dev"
+start "Editron Backend" cmd /k "cd /d ""%~dp0backend"" && npm run dev"
 
 echo [2/3] Starting Frontend UI Server (Port 5173)...
-start "Studio Frontend" cmd /k "cd /d ""%~dp0frontend"" && npm run dev"
+start "Editron Frontend" cmd /k "cd /d ""%~dp0frontend"" && npm run dev"
 
 echo [3/3] Waiting for servers to initialize...
 ping -n 5 127.0.0.1 >nul
 
 echo.
 echo ===================================================
-echo  Studio is running!
+echo  Editron is running!
 echo  Frontend:      http://localhost:5173
 echo  Health check:  http://localhost:3001/api/health
 echo ===================================================
